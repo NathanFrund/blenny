@@ -35,17 +35,34 @@ conduit := aConduit
 ]
 
 { #category : 'websocket' }
-BlennyWebApp >> handleWebSocket: webSocket [
-    "Handle a WebSocket connection using proper ZnWebSocketDelegate pattern"
+BlennyWebApp >> handleWebSocket: aWebSocket [
+    Transcript show: '!!! WebSocket Connected'; cr.
     
-    BlennyPubSub current subscribe: webSocket to: 'broadcast'.
+    [ aWebSocket isConnected ] whileTrue: [
+        | message |
+        [ 
+            "1. Robust Read: Catch the internal Zinc error immediately"
+            message := [ aWebSocket readMessage ] on: Error do: [ :ex | 
+                Transcript show: '!!! Zinc Internal Close: ', ex description; cr.
+                ^ self ]. "Exit immediately on ANY error during read"
+
+            "2. If message is nil, the stream ended normally"
+            message ifNil: [ 
+                Transcript show: '!!! Client disconnected'; cr.
+                ^ self ].
+
+            "3. Safe Processing"
+            Transcript show: 'Received: ', message asString; cr.
+            aWebSocket sendMessage: 'Echo: ', message asString.
+
+        ] on: Error do: [ :ex | 
+            Transcript show: 'Outer loop catch: ', ex description; cr.
+            ^ self 
+        ].
+        (Delay forMilliseconds: 20) wait.
+    ].
     
-    webSocket onClose: [
-        BlennyPubSub current unsubscribe: webSocket from: 'broadcast' ].
-    
-    webSocket runWith: [ :message |
-        Transcript show: 'WebSocket message: ', message; cr.
-        webSocket sendMessage: 'Echo: ', message ].
+    Transcript show: '!!! WebSocket Closed'; cr.
 ]
 
 { #category : 'initialization' }
