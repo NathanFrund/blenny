@@ -8,7 +8,9 @@ Class {
 		'rootPath',
 		'server',
 		'port',
-		'connectedClients'
+		'connectedClients',
+		'htmlBridge',
+		'dataBridge'
 	],
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
@@ -61,8 +63,7 @@ BlennyWebApp >> broadcastData: aString [
 
 { #category : 'publishing' }
 BlennyWebApp >> broadcastHtml: aString [
-    "Broadcast HTML to all connected clients"
-    self broadcast: aString toEndpoint: 'html'
+    self htmlBridge publish: (BlennyHTMLBroadcast payload: aString)
 ]
 
 { #category : 'accessing' }
@@ -75,9 +76,14 @@ BlennyWebApp >> conduit: aConduit [
 conduit := aConduit 
 ]
 
-{ #category : 'accessing - convenience' }
-BlennyWebApp >> dataBridge [ 
-	^ self bridgeForEndpoint: 'data'
+{ #category : 'accessing' }
+BlennyWebApp >> dataBridge [
+	^ dataBridge
+]
+
+{ #category : 'accessing' }
+BlennyWebApp >> dataBridge: aBridge [
+	dataBridge := aBridge 
 ]
 
 { #category : 'as yet unclassified' }
@@ -126,7 +132,7 @@ BlennyWebApp >> directData: aString toUser: aUserId [
 
 { #category : 'publishing' }
 BlennyWebApp >> directHtml: aString toUser: aUserId [
-    self direct: aString toUser: aUserId endpoint: 'html'
+    self htmlBridge publish: (BlennyHTMLDirect payload: aString toUser: aUserId)
 ]
 
 { #category : 'as yet unclassified' }
@@ -190,9 +196,14 @@ BlennyWebApp >> handleWebSocket: aWebSocket forUser: aUserId endpoint: aString [
 
 ]
 
-{ #category : 'accessing - convenience' }
-BlennyWebApp >> htmlBridge [ 
-	^ self bridgeForEndpoint: 'html'
+{ #category : 'accessing' }
+BlennyWebApp >> htmlBridge [
+	^ htmlBridge 
+]
+
+{ #category : 'accessing' }
+BlennyWebApp >> htmlBridge: aBridge [
+	htmlBridge := aBridge 
 ]
 
 { #category : 'initialization' }
@@ -274,15 +285,24 @@ BlennyWebApp >> startOn: aPath port: aPortNumber [
 BlennyWebApp >> startServer [
     | delegate |
     ZnServer allInstancesDo: [ :s | s port = port ifTrue: [ s stop ] ].
+
+"Create bridges"
+    htmlBridge := BlennyAnnouncerBridge new initializeWithEndpoint: 'html'.
+    dataBridge := BlennyAnnouncerBridge new initializeWithEndpoint: 'data'.
     
     delegate := BlennyRouter new
         rootPath: rootPath;
-        webApp: self;
-        yourself.
+			htmlBridge: htmlBridge;
+			dataBridge: dataBridge ;
+        webApp: self.
     
     server := (ZnServer on: port)
         delegate: delegate;
         start.
+
+"Store bridges for later use"
+    self htmlBridge: htmlBridge.
+    self dataBridge: dataBridge.
     
     Transcript show: '========================================'; cr.
     Transcript show: 'Blenny server started on port ', port asString; cr.

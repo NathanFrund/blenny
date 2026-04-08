@@ -3,7 +3,9 @@ Class {
 	#superclass : 'Object',
 	#instVars : [
 		'webApp',
-		'rootPath'
+		'rootPath',
+		'htmlBridge',
+		'dataBridge'
 	],
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
@@ -19,34 +21,58 @@ BlennyRouter >> authenticatedUserIdFrom: request [
     ^ session  "Return user ID or nil"
 ]
 
+{ #category : 'accessing' }
+BlennyRouter >> dataBridge [
+	^ dataBridge
+]
+
+{ #category : 'accessing' }
+BlennyRouter >> dataBridge: aBridge [
+	dataBridge := aBridge 
+]
+
 { #category : 'public' }
 BlennyRouter >> handleRequest: request [
     | uri path segments |
     uri := request uri.
     path := uri pathPrintString.
     segments := uri segments asArray.  "Ensure it's an array"
-    
+
     "Debug"
     Transcript show: 'Request path: ', path; cr.
     
-    "--- WebSocket Routes ---"
-    (segments notEmpty and: [ segments first = 'ws' ]) ifTrue: [
-        | userId wsType |
+"--- WebSocket Routes ---"
+(segments notEmpty and: [ segments first = 'ws' ]) ifTrue: [
+    | userId wsType bridge |
+    
+    wsType := (segments size > 1 and: [ segments second isString ])
+        ifTrue: [ segments second ]
+        ifFalse: [ 'html' ].
+
+	bridge := wsType = 'html' 
+    ifTrue: [ htmlBridge ]
+    ifFalse: [ dataBridge ].
+
+bridge ifNil: [
+    Transcript show: 'ERROR: Bridge is nil for type: ', wsType; cr.
+    ^ ZnResponse serverError: 'WebSocket bridge not configured' ].
+    
+    userId := request uri queryAt: 'userId' ifAbsent: [ nil ].
+    
+    ((request headers at: 'Upgrade' ifAbsent: [ '' ]) asLowercase includesSubstring: 'websocket') 
+    ifTrue: [
+        Transcript show: 'WebSocket upgrade - User: ', (userId ifNil: ['MISSING']), ' Type: ', wsType; cr.
         
-        wsType := (segments size > 1 and: [ segments second isString ])
-            ifTrue: [ segments second ]
-            ifFalse: [ 'html' ].
+        "Select the appropriate bridge"
+        bridge := wsType = 'html' 
+            ifTrue: [ htmlBridge ]
+            ifFalse: [ dataBridge ].
         
-        userId := request uri queryAt: 'userId' ifAbsent: [ nil ].
-        
-        ((request headers at: 'Upgrade' ifAbsent: [ '' ]) asLowercase includesSubstring: 'websocket') 
-        ifTrue: [
-            Transcript show: 'WebSocket upgrade - User: ', (userId ifNil: ['MISSING']), ' Type: ', wsType; cr.
-            ^ (ZnWebSocketDelegate handler: [ :webSocket |
-                webApp handleWebSocket: webSocket forUser: userId endpoint: wsType ]) 
-                handleRequest: request ]
-        ifFalse: [
-            ^ ZnResponse badRequest: request ] ].
+        ^ (ZnWebSocketDelegate handler: [ :webSocket |
+            bridge handleWebSocket: webSocket forUser: userId ]) 
+            handleRequest: request ]
+    ifFalse: [
+        ^ ZnResponse badRequest: request ] ].
 
 
     "--- Home Route ---"
@@ -71,6 +97,16 @@ BlennyRouter >> handleRequest: request [
 
     "--- Fallback ---"
     ^ ZnResponse notFound: path
+]
+
+{ #category : 'accessing' }
+BlennyRouter >> htmlBridge [
+	^ htmlBridge
+]
+
+{ #category : 'accessing' }
+BlennyRouter >> htmlBridge: aBridge [
+	htmlBridge := aBridge
 ]
 
 { #category : 'accessing' }

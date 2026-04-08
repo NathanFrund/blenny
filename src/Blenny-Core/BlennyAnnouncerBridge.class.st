@@ -12,6 +12,28 @@ Class {
 	#package : 'Blenny-Core'
 }
 
+{ #category : 'client management' }
+BlennyAnnouncerBridge >> addClient: aWebSocket forUser: aUserId [
+    | userClients clientInfo |
+    
+    userClients := clientsByUserId at: aUserId ifAbsentPut: [ OrderedCollection new ].
+    clientInfo := { 'socket' -> aWebSocket. 'endpoint' -> endpoint } asDictionary.
+    userClients add: clientInfo.
+    clientsById at: aWebSocket hash put: clientInfo.
+    
+    Transcript show: 'Bridge CONNECTED: ', aUserId, ' [', endpoint, '] (Total users: ', clientsByUserId size asString, ')'; cr.
+    
+    "Send welcome message"
+    aWebSocket sendMessage: 'Welcome ', aUserId, ' (', endpoint, ' endpoint)'.
+    
+    ^ clientInfo
+]
+
+{ #category : 'client management' }
+BlennyAnnouncerBridge >> allClients [
+    ^ clientsById values
+]
+
 { #category : 'handlers' }
 BlennyAnnouncerBridge >> broadcastData: aPayload [
 	"Broadcast JSON to all data clients"
@@ -28,15 +50,17 @@ BlennyAnnouncerBridge >> broadcastData: aPayload [
 
 { #category : 'handlers' }
 BlennyAnnouncerBridge >> broadcastHtml: aPayload [
-    "Broadcast HTML to all HTML clients"
-    clientsById values asArray do: [ :client |
-        (client endpoint = 'html' and: [ client isClosed not ]) ifTrue: [
-            [ client sendMessage: aPayload ]  "Use client's sendMessage, not socket directly"
-                on: Error
-                do: [ :ex |
-                    Transcript
-                        show: 'HTML broadcast failed: ' , ex description;
-                        cr ] ] ]
+    "Broadcast HTML to all HTML clients connected to this bridge"
+    self allClients do: [ :clientInfo |
+        [ (clientInfo at: 'socket') sendMessage: aPayload ]
+            on: Error
+            do: [ :ex | 
+                Transcript show: 'HTML broadcast failed: ', ex description; cr ] ]
+]
+
+{ #category : 'client management' }
+BlennyAnnouncerBridge >> clientConnectionsForUser: aUserId [
+    ^ clientsByUserId at: aUserId ifAbsent: [ #() ]
 ]
 
 { #category : 'as yet unclassified' }
@@ -61,17 +85,14 @@ BlennyAnnouncerBridge >> directData: aPayload to: aUserId [
 
 { #category : 'handlers' }
 BlennyAnnouncerBridge >> directHtml: aPayload to: aUserId [
-	"Send HTML directly to a specific user"
-
-	(clientsByUserId at: aUserId ifAbsent: [ #(  ) ]) asArray do: [
-			:client |
-			(client endpoint = 'html' and: [ client isClosed not ]) ifTrue: [
-					[ client sendMessage: aPayload ]
-						on: Error
-						do: [ :ex |
-								Transcript
-									show: 'HTML direct failed: ' , ex description;
-									cr ] ] ]
+    "Send HTML directly to a specific user"
+    | clients |
+    clients := self clientConnectionsForUser: aUserId.
+    clients do: [ :clientInfo |
+        [ (clientInfo at: 'socket') sendMessage: aPayload ]
+            on: Error
+            do: [ :ex | 
+                Transcript show: 'HTML direct failed: ', ex description; cr ] ]
 ]
 
 { #category : 'as yet unclassified' }
@@ -100,53 +121,21 @@ BlennyAnnouncerBridge >> fanOutDirect: aMessage to: aTopic [
                 do: [ :ex | Transcript show: 'Direct send failed: ', ex description; cr ] ] ]
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'handlers' }
 BlennyAnnouncerBridge >> handleWebSocket: aWebSocket forUser: aUserId [
-    | client |
-
-	Transcript show: '=== HANDLE WEBSOCKET START ==='; cr.
-    Transcript show: 'User: ', aUserId, ' Endpoint: ', endpoint; cr.
-
-    client := BlennyWebSocketClient new
-    userId: aUserId 
-    endpoint: endpoint 
-    socket: aWebSocket 
-    bridge: self.
-
-Transcript show: 'Client created. ID: ', client id; cr.
-    Transcript show: 'Client userId: ', client userId; cr.
-    Transcript show: 'Client endpoint: ', client endpoint; cr.
+    | clientInfo |
     
-    "Store the client"
-    clientsById at: client id put: client.
-    (clientsByUserId at: aUserId ifAbsentPut: [ OrderedCollection new ]) add: client.
-
- Transcript show: 'ClientsById size: ', clientsById size asString; cr.
-    Transcript show: 'ClientsByUserId size: ', clientsByUserId size; cr.
-    Transcript show: '=== HANDLE WEBSOCKET END ==='; cr.
-
-Transcript show: 'Connection established, keeping open...'; cr.
-^ self.
+    "Add client to this bridge"
+    clientInfo := self addClient: aWebSocket forUser: aUserId.
     
-"    ""Start the read loop with defensive error handling""
-    [ 
-    [ 
-        aWebSocket runWith: [ :message |
-            ""Optional: handle incoming messages from client""
-            message ifNotNil: [
-                Transcript show: 'Message from ', aUserId, ': ', message; cr.
-                ""Uncomment when BlennyClientMessage is created""
-                ""announcer announce: (BlennyClientMessage new
-                    fromUserId: aUserId;
-                    payload: message;
-                    yourself)"" ]
-        ]
-    ] on: Error do: [ :ex |
-        Transcript show: 'Bridge read error for ', aUserId, ': ', ex description; cr. ]
-] ensure: [
-    self unregisterClient: client.
-    Transcript show: 'Client disconnected: ', aUserId; cr.
-]"
+    "Start the read loop"
+    [ aWebSocket runWith: [ :message |
+        message ifNotNil: [
+            Transcript show: aUserId, ' [', endpoint, ']: ', message asString; cr.
+            aWebSocket sendMessage: 'Echo: ', message asString ] ] ]
+    ensure: [
+        "Cleanup on disconnect"
+        self removeClient: aWebSocket forUser: aUserId ]
 ]
 
 { #category : 'initialization' }
@@ -197,6 +186,21 @@ BlennyAnnouncerBridge >> initializeWithEndpoint: aString [
 BlennyAnnouncerBridge >> publish: anAnnouncement [
     isRunning ifFalse: [ ^ self ].
     announcer announce: anAnnouncement
+]
+
+{ #category : 'client management' }
+BlennyAnnouncerBridge >> removeClient: aWebSocket forUser: aUserId [
+    | clientInfo userClients |
+    
+    clientInfo := clientsById at: aWebSocket hash ifAbsent: [ ^ self ].
+    userClients := clientsByUserId at: aUserId ifAbsent: [ ^ self ].
+    
+    userClients remove: clientInfo ifAbsent: [].
+    clientsById removeKey: aWebSocket hash ifAbsent: [].
+    
+    userClients ifEmpty: [ clientsByUserId removeKey: aUserId ifAbsent: [] ].
+    
+    Transcript show: 'Bridge DISCONNECTED: ', aUserId, ' [', endpoint, '] (Remaining: ', clientsByUserId size asString, ')'; cr.
 ]
 
 { #category : 'accessing' }
