@@ -8,7 +8,6 @@ Class {
 		'rootPath',
 		'server',
 		'port',
-		'connectedClients',
 		'htmlBridge',
 		'dataBridge'
 	],
@@ -27,38 +26,9 @@ BlennyWebApp >> announceStarted [
         cr.
 ]
 
-{ #category : 'as yet unclassified' }
-BlennyWebApp >> broadcast: aMessage [
-    "Send to all clients regardless of endpoint"
-    | count |
-    count := 0.
-    connectedClients valuesDo: [ :clients |
-        clients do: [ :clientInfo |
-            [ (clientInfo at: 'socket') sendMessage: aMessage ]
-                on: Error
-                do: [ :ex | Transcript show: 'Broadcast failed: ', ex description; cr ].
-            count := count + 1 ] ].
-    Transcript show: 'Broadcast to ', count asString, ' clients: ', aMessage; cr.
-]
-
-{ #category : 'as yet unclassified' }
-BlennyWebApp >> broadcast: aMessage toEndpoint: aString [
-    "Send to all clients connected to a specific endpoint"
-    | count |
-    count := 0.
-    connectedClients valuesDo: [ :clients |
-        clients do: [ :clientInfo |
-            (clientInfo at: 'endpoint') = aString ifTrue: [
-                [ (clientInfo at: 'socket') sendMessage: aMessage ]
-                    on: Error
-                    do: [ :ex | Transcript show: 'Broadcast failed: ', ex description; cr ].
-                count := count + 1 ] ] ].
-    Transcript show: 'Broadcast to ', count asString, ' [', aString, '] clients: ', aMessage; cr.
-]
-
 { #category : 'publishing' }
 BlennyWebApp >> broadcastData: aString [
-    self broadcast: aString toEndpoint: 'data'
+    self dataBridge publish: (BlennyDataBroadcast payload: aString)
 ]
 
 { #category : 'publishing' }
@@ -86,114 +56,14 @@ BlennyWebApp >> dataBridge: aBridge [
 	dataBridge := aBridge 
 ]
 
-{ #category : 'as yet unclassified' }
-BlennyWebApp >> direct: aMessage toUser: aUserId [
-    "Send a message to a specific user"
-    | clients count |
-    clients := connectedClients at: aUserId ifAbsent: [ 
-        Transcript show: 'Direct message failed - user not connected: ', aUserId; cr.
-        ^ self ].
-    
-    count := 0.
-    clients do: [ :socket |
-        [ socket sendMessage: aMessage ]
-            on: Error
-            do: [ :ex | 
-                Transcript show: 'Direct message failed for ', aUserId, ': ', ex description; cr ].
-        count := count + 1 ].
-    
-    Transcript show: 'Direct message to ', aUserId, ' (', count asString, ' connections): ', aMessage; cr.
-]
-
-{ #category : 'as yet unclassified' }
-BlennyWebApp >> direct: aMessage toUser: aUserId endpoint: aString [
-    "Send to specific user on specific endpoint"
-    | clients count |
-    clients := connectedClients at: aUserId ifAbsent: [ 
-        Transcript show: 'Direct failed - user not connected: ', aUserId; cr.
-        ^ self ].
-    
-    count := 0.
-    clients do: [ :clientInfo |
-        (clientInfo at: 'endpoint') = aString ifTrue: [
-            [ (clientInfo at: 'socket') sendMessage: aMessage ]
-                on: Error
-                do: [ :ex | 
-                    Transcript show: 'Direct failed for ', aUserId, ': ', ex description; cr ].
-            count := count + 1 ] ].
-    
-    Transcript show: 'Direct to ', aUserId, ' [', aString, '] (', count asString, ' conns): ', aMessage; cr.
-]
-
 { #category : 'publishing' }
 BlennyWebApp >> directData: aString toUser: aUserId [
-    self direct: aString toUser: aUserId endpoint: 'data'
+    self dataBridge publish: (BlennyDataDirect payload: aString toUser: aUserId)
 ]
 
 { #category : 'publishing' }
 BlennyWebApp >> directHtml: aString toUser: aUserId [
     self htmlBridge publish: (BlennyHTMLDirect payload: aString toUser: aUserId)
-]
-
-{ #category : 'as yet unclassified' }
-BlennyWebApp >> extractEndpointFromPath: aPath [
-    aPath = '/ws/html' ifTrue: [ ^ 'html' ].
-    aPath = '/ws/data' ifTrue: [ ^ 'data' ].
-    ^ nil
-]
-
-{ #category : 'as yet unclassified' }
-BlennyWebApp >> handleWebSocket: aWebSocket forUser: aUserId [
-    aUserId ifNil: [ 
-        aWebSocket sendMessage: 'Error: Missing userId parameter'; close.
-        ^ self ].
-    
-    "Store client"
-    (connectedClients at: aUserId ifAbsentPut: [ OrderedCollection new ]) add: aWebSocket.
-    
-    Transcript show: 'Client CONNECTED: ', aUserId, ' (Total users: ', connectedClients size asString, ')'; cr.
-    
-    "ADD THIS LINE - Send welcome message"
-    aWebSocket sendMessage: 'Welcome to Blenny!! User: ', aUserId.
-    
-    "Optional: Also send 'Connected as:' if you want both"
-    "aWebSocket sendMessage: 'Connected as: ', aUserId."
-    
-    [ aWebSocket runWith: [ :message |
-        Transcript show: aUserId, ': ', message asString; cr.
-        aWebSocket sendMessage: 'Echo: ', message asString ] ]
-    ensure: [
-        (connectedClients at: aUserId ifAbsent: [ ^ self ]) remove: aWebSocket ifAbsent: [].
-        (connectedClients at: aUserId ifAbsent: [ #() ]) ifEmpty: [ 
-            connectedClients removeKey: aUserId ].
-        Transcript show: 'Client DISCONNECTED: ', aUserId, ' (Remaining users: ', connectedClients size asString, ')'; cr. ]
-]
-
-{ #category : 'as yet unclassified' }
-BlennyWebApp >> handleWebSocket: aWebSocket forUser: aUserId endpoint: aString [
-    | userClients clientInfo |
-    
-    aUserId ifNil: [ 
-        aWebSocket sendMessage: 'Error: Missing userId parameter'; close.
-        ^ self ].
-    
-    "Store client with endpoint info"
-    userClients := connectedClients at: aUserId ifAbsentPut: [ OrderedCollection new ].
-    clientInfo := { 'socket' -> aWebSocket. 'endpoint' -> aString } asDictionary.
-    userClients add: clientInfo.
-    
-    Transcript show: 'CONNECTED: ', aUserId, ' [', aString, '] (Total users: ', connectedClients size asString, ')'; cr.
-    
-    aWebSocket sendMessage: 'Welcome ', aUserId, ' (', aString, ' endpoint)'.
-    
-    [ aWebSocket runWith: [ :message |
-        Transcript show: aUserId, ' [', aString, ']: ', message asString; cr.
-        aWebSocket sendMessage: 'Echo: ', message asString ] ]
-    ensure: [
-        userClients remove: clientInfo ifAbsent: [].
-        userClients ifEmpty: [ connectedClients removeKey: aUserId ifAbsent: [] ].
-        Transcript show: 'DISCONNECTED: ', aUserId, ' [', aString, '] (Remaining: ', connectedClients size asString, ')'; cr. ]
-
 ]
 
 { #category : 'accessing' }
@@ -210,7 +80,6 @@ BlennyWebApp >> htmlBridge: aBridge [
 BlennyWebApp >> initialize [
     super initialize.
     port := 8081.
-    connectedClients := Dictionary new.
 ]
 
 { #category : 'module-loading' }
@@ -219,11 +88,6 @@ BlennyWebApp >> loadModulesInto: aDispatcher [
     (Smalltalk allClasses select: [ :cls |
         cls includesBehavior: TBlennyModule ]) do: [ :moduleClass |
             moduleClass registerRoutesOn: aDispatcher ].
-]
-
-{ #category : 'accessing' }
-BlennyWebApp >> pubSub [
-	^ BlennyPubSub current
 ]
 
 { #category : 'actions' }
@@ -319,6 +183,5 @@ BlennyWebApp >> stop [
     conduit ifNotNil: [ 
         conduit stop.
         conduit := nil ].
-    connectedClients removeAll.
     Transcript show: 'Blenny server stopped.'; cr.
 ]

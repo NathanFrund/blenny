@@ -36,16 +36,12 @@ BlennyAnnouncerBridge >> allClients [
 
 { #category : 'handlers' }
 BlennyAnnouncerBridge >> broadcastData: aPayload [
-	"Broadcast JSON to all data clients"
-
-	clientsById values asArray do: [ :client |
-			(client endpoint = 'data' and: [ client isClosed not ]) ifTrue: [
-					[ client sendMessage: aPayload ]
-						on: Error
-						do: [ :ex |
-								Transcript
-									show: 'Data broadcast failed: ' , ex description;
-									cr ] ] ]
+    "Broadcast JSON to all data clients connected to this bridge"
+    self allClients do: [ :clientInfo |
+        [ (clientInfo at: 'socket') sendMessage: aPayload ]
+            on: Error
+            do: [ :ex | 
+                Transcript show: 'Data broadcast failed: ', ex description; cr ] ]
 ]
 
 { #category : 'handlers' }
@@ -70,17 +66,14 @@ BlennyAnnouncerBridge >> connectedCount [
 
 { #category : 'handlers' }
 BlennyAnnouncerBridge >> directData: aPayload to: aUserId [
-	"Send JSON directly to a specific user"
-
-	(clientsByUserId at: aUserId ifAbsent: [ #(  ) ]) asArray do: [
-			:client |
-			(client endpoint = 'data' and: [ client isClosed not ]) ifTrue: [
-					[ client sendMessage: aPayload ]
-						on: Error
-						do: [ :ex |
-								Transcript
-									show: 'Data direct failed: ' , ex description;
-									cr ] ] ]
+    "Send JSON directly to a specific user"
+    | clients |
+    clients := self clientConnectionsForUser: aUserId.
+    clients do: [ :clientInfo |
+        [ (clientInfo at: 'socket') sendMessage: aPayload ]
+            on: Error
+            do: [ :ex | 
+                Transcript show: 'Data direct failed: ', ex description; cr ] ]
 ]
 
 { #category : 'handlers' }
@@ -93,32 +86,6 @@ BlennyAnnouncerBridge >> directHtml: aPayload to: aUserId [
             on: Error
             do: [ :ex | 
                 Transcript show: 'HTML direct failed: ', ex description; cr ] ]
-]
-
-{ #category : 'as yet unclassified' }
-BlennyAnnouncerBridge >> fanOut: aMessage to: aTopic [
-    "Broadcast to all connected clients - copy collection to avoid modification during iteration"
-    clientsById copy valuesDo: [ :client |
-        client isClosed ifFalse: [
-            [ client sendMessage: aMessage payload ]
-                on: Error
-                do: [ :ex | Transcript show: 'Broadcast failed: ', ex description; cr ] ] ]
-]
-
-{ #category : 'as yet unclassified' }
-BlennyAnnouncerBridge >> fanOutDirect: aMessage to: aTopic [
-    "Extract user ID from topic and send only to that user"
-    | userId prefix recipients |
-    prefix := 'ws.', endpoint, '.direct.'.
-    userId := aTopic copyFrom: prefix size + 1.
-    recipients := clientsByUserId at: userId ifAbsent: [ #() ].
-    
-    "Copy to avoid modification during iteration"
-    recipients copy do: [ :client |
-        client isClosed ifFalse: [
-            [ client sendMessage: aMessage payload ]
-                on: Error
-                do: [ :ex | Transcript show: 'Direct send failed: ', ex description; cr ] ] ]
 ]
 
 { #category : 'handlers' }
@@ -219,38 +186,4 @@ BlennyAnnouncerBridge >> stop [
     clientsByUserId removeAll.
     
     Transcript show: 'Bridge stopped for endpoint: ', endpoint; cr.
-]
-
-{ #category : 'subscription' }
-BlennyAnnouncerBridge >> subscribeTo: aTopic [
-    "Single subscriber per topic - this is the bridge"
-    announcer when: aTopic do: [ :message |
-        isRunning ifTrue: [ self fanOut: message to: aTopic ] ]
-
-]
-
-{ #category : 'as yet unclassified' }
-BlennyAnnouncerBridge >> subscribeToPattern: aPattern [
-    "Handle direct messages like ws.html.direct.user123"
-    announcer when: aPattern do: [ :message |
-        isRunning ifTrue: [
-            | topic |
-            topic := message topic.
-            (topic beginsWith: ('ws.', endpoint, '.direct.')) ifTrue: [
-                self fanOutDirect: message to: topic ] ] ]
-]
-
-{ #category : 'as yet unclassified' }
-BlennyAnnouncerBridge >> unregisterClient: aClient [
-    aClient isClosed ifTrue: [ ^ self ].
-    aClient close.
-    
-    clientsById removeKey: aClient id ifAbsent: [].
-    (clientsByUserId at: aClient userId ifAbsent: [ ^ self ]) 
-        remove: aClient 
-        ifAbsent: [].
-        
-    "Clean up empty user entries"
-    (clientsByUserId at: aClient userId ifAbsent: [ #() ]) ifEmpty: [
-        clientsByUserId removeKey: aClient userId ifAbsent: [] ].
 ]
