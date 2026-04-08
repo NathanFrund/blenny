@@ -7,7 +7,8 @@ Class {
 		'conduit',
 		'rootPath',
 		'server',
-		'port'
+		'port',
+		'connectedClients'
 	],
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
@@ -24,6 +25,46 @@ BlennyWebApp >> announceStarted [
         cr.
 ]
 
+{ #category : 'as yet unclassified' }
+BlennyWebApp >> broadcast: aMessage [
+    "Send to all clients regardless of endpoint"
+    | count |
+    count := 0.
+    connectedClients valuesDo: [ :clients |
+        clients do: [ :clientInfo |
+            [ (clientInfo at: 'socket') sendMessage: aMessage ]
+                on: Error
+                do: [ :ex | Transcript show: 'Broadcast failed: ', ex description; cr ].
+            count := count + 1 ] ].
+    Transcript show: 'Broadcast to ', count asString, ' clients: ', aMessage; cr.
+]
+
+{ #category : 'as yet unclassified' }
+BlennyWebApp >> broadcast: aMessage toEndpoint: aString [
+    "Send to all clients connected to a specific endpoint"
+    | count |
+    count := 0.
+    connectedClients valuesDo: [ :clients |
+        clients do: [ :clientInfo |
+            (clientInfo at: 'endpoint') = aString ifTrue: [
+                [ (clientInfo at: 'socket') sendMessage: aMessage ]
+                    on: Error
+                    do: [ :ex | Transcript show: 'Broadcast failed: ', ex description; cr ].
+                count := count + 1 ] ] ].
+    Transcript show: 'Broadcast to ', count asString, ' [', aString, '] clients: ', aMessage; cr.
+]
+
+{ #category : 'publishing' }
+BlennyWebApp >> broadcastData: aString [
+    self broadcast: aString toEndpoint: 'data'
+]
+
+{ #category : 'publishing' }
+BlennyWebApp >> broadcastHtml: aString [
+    "Broadcast HTML to all connected clients"
+    self broadcast: aString toEndpoint: 'html'
+]
+
 { #category : 'accessing' }
 BlennyWebApp >> conduit [
 	^ conduit
@@ -34,25 +75,131 @@ BlennyWebApp >> conduit: aConduit [
 conduit := aConduit 
 ]
 
-{ #category : 'websocket' }
-BlennyWebApp >> handleWebSocket: aWebSocket [
-    Transcript show: '!!!!!! WebSocket Connected'; cr.
+{ #category : 'accessing - convenience' }
+BlennyWebApp >> dataBridge [ 
+	^ self bridgeForEndpoint: 'data'
+]
+
+{ #category : 'as yet unclassified' }
+BlennyWebApp >> direct: aMessage toUser: aUserId [
+    "Send a message to a specific user"
+    | clients count |
+    clients := connectedClients at: aUserId ifAbsent: [ 
+        Transcript show: 'Direct message failed - user not connected: ', aUserId; cr.
+        ^ self ].
     
-    aWebSocket sendMessage: 'Welcome to Blenny!!'.
+    count := 0.
+    clients do: [ :socket |
+        [ socket sendMessage: aMessage ]
+            on: Error
+            do: [ :ex | 
+                Transcript show: 'Direct message failed for ', aUserId, ': ', ex description; cr ].
+        count := count + 1 ].
     
-    "Wrap runWith: to catch closure"
+    Transcript show: 'Direct message to ', aUserId, ' (', count asString, ' connections): ', aMessage; cr.
+]
+
+{ #category : 'as yet unclassified' }
+BlennyWebApp >> direct: aMessage toUser: aUserId endpoint: aString [
+    "Send to specific user on specific endpoint"
+    | clients count |
+    clients := connectedClients at: aUserId ifAbsent: [ 
+        Transcript show: 'Direct failed - user not connected: ', aUserId; cr.
+        ^ self ].
+    
+    count := 0.
+    clients do: [ :clientInfo |
+        (clientInfo at: 'endpoint') = aString ifTrue: [
+            [ (clientInfo at: 'socket') sendMessage: aMessage ]
+                on: Error
+                do: [ :ex | 
+                    Transcript show: 'Direct failed for ', aUserId, ': ', ex description; cr ].
+            count := count + 1 ] ].
+    
+    Transcript show: 'Direct to ', aUserId, ' [', aString, '] (', count asString, ' conns): ', aMessage; cr.
+]
+
+{ #category : 'publishing' }
+BlennyWebApp >> directData: aString toUser: aUserId [
+    self direct: aString toUser: aUserId endpoint: 'data'
+]
+
+{ #category : 'publishing' }
+BlennyWebApp >> directHtml: aString toUser: aUserId [
+    self direct: aString toUser: aUserId endpoint: 'html'
+]
+
+{ #category : 'as yet unclassified' }
+BlennyWebApp >> extractEndpointFromPath: aPath [
+    aPath = '/ws/html' ifTrue: [ ^ 'html' ].
+    aPath = '/ws/data' ifTrue: [ ^ 'data' ].
+    ^ nil
+]
+
+{ #category : 'as yet unclassified' }
+BlennyWebApp >> handleWebSocket: aWebSocket forUser: aUserId [
+    aUserId ifNil: [ 
+        aWebSocket sendMessage: 'Error: Missing userId parameter'; close.
+        ^ self ].
+    
+    "Store client"
+    (connectedClients at: aUserId ifAbsentPut: [ OrderedCollection new ]) add: aWebSocket.
+    
+    Transcript show: 'Client CONNECTED: ', aUserId, ' (Total users: ', connectedClients size asString, ')'; cr.
+    
+    "ADD THIS LINE - Send welcome message"
+    aWebSocket sendMessage: 'Welcome to Blenny!! User: ', aUserId.
+    
+    "Optional: Also send 'Connected as:' if you want both"
+    "aWebSocket sendMessage: 'Connected as: ', aUserId."
+    
     [ aWebSocket runWith: [ :message |
-        Transcript show: 'Received: ', message asString; cr.
+        Transcript show: aUserId, ': ', message asString; cr.
         aWebSocket sendMessage: 'Echo: ', message asString ] ]
     ensure: [
-        Transcript show: '!!!!!! WebSocket Closed'; cr.
-        "Clean up any subscriptions here" ].
+        (connectedClients at: aUserId ifAbsent: [ ^ self ]) remove: aWebSocket ifAbsent: [].
+        (connectedClients at: aUserId ifAbsent: [ #() ]) ifEmpty: [ 
+            connectedClients removeKey: aUserId ].
+        Transcript show: 'Client DISCONNECTED: ', aUserId, ' (Remaining users: ', connectedClients size asString, ')'; cr. ]
+]
+
+{ #category : 'as yet unclassified' }
+BlennyWebApp >> handleWebSocket: aWebSocket forUser: aUserId endpoint: aString [
+    | userClients clientInfo |
+    
+    aUserId ifNil: [ 
+        aWebSocket sendMessage: 'Error: Missing userId parameter'; close.
+        ^ self ].
+    
+    "Store client with endpoint info"
+    userClients := connectedClients at: aUserId ifAbsentPut: [ OrderedCollection new ].
+    clientInfo := { 'socket' -> aWebSocket. 'endpoint' -> aString } asDictionary.
+    userClients add: clientInfo.
+    
+    Transcript show: 'CONNECTED: ', aUserId, ' [', aString, '] (Total users: ', connectedClients size asString, ')'; cr.
+    
+    aWebSocket sendMessage: 'Welcome ', aUserId, ' (', aString, ' endpoint)'.
+    
+    [ aWebSocket runWith: [ :message |
+        Transcript show: aUserId, ' [', aString, ']: ', message asString; cr.
+        aWebSocket sendMessage: 'Echo: ', message asString ] ]
+    ensure: [
+        userClients remove: clientInfo ifAbsent: [].
+        userClients ifEmpty: [ connectedClients removeKey: aUserId ifAbsent: [] ].
+        Transcript show: 'DISCONNECTED: ', aUserId, ' [', aString, '] (Remaining: ', connectedClients size asString, ')'; cr. ]
+
+]
+
+{ #category : 'accessing - convenience' }
+BlennyWebApp >> htmlBridge [ 
+	^ self bridgeForEndpoint: 'html'
 ]
 
 { #category : 'initialization' }
 BlennyWebApp >> initialize [
     super initialize.
     port := 8081.
+    connectedClients := Dictionary new.
 ]
 
 { #category : 'module-loading' }
@@ -61,6 +208,11 @@ BlennyWebApp >> loadModulesInto: aDispatcher [
     (Smalltalk allClasses select: [ :cls |
         cls includesBehavior: TBlennyModule ]) do: [ :moduleClass |
             moduleClass registerRoutesOn: aDispatcher ].
+]
+
+{ #category : 'accessing' }
+BlennyWebApp >> pubSub [
+	^ BlennyPubSub current
 ]
 
 { #category : 'actions' }
@@ -114,48 +266,39 @@ BlennyWebApp >> startOn: aPath port: aPortNumber [
     rootPath := aPath ifNotNil: [ aPath asFileReference ].
     
     rootPath ifNotNil: [ self setupDiskWatcher ].
-    self startUnifiedServer.
+    self startServer.
     self announceStarted.
 ]
 
-{ #category : 'server' }
-BlennyWebApp >> startUnifiedServer [
+{ #category : 'as yet unclassified' }
+BlennyWebApp >> startServer [
     | delegate |
-    "Cleanup old servers on this port"
     ZnServer allInstancesDo: [ :s | s port = port ifTrue: [ s stop ] ].
     
-    "Initialize your custom delegate with the app state"
-    delegate := BlennyStaticDelegate new
-        rootPath: rootPath; "Passed from BlennyWebApp instance variable"
-        webApp: self;       "Allows delegate to call self renderPage:"
+    delegate := BlennyRouter new
+        rootPath: rootPath;
+        webApp: self;
         yourself.
     
-    "Start Zinc using the custom delegate object"
     server := (ZnServer on: port)
         delegate: delegate;
         start.
     
-    Transcript show: 'Blenny server started on port ', port asString, ' with custom delegate.'; cr.
+    Transcript show: '========================================'; cr.
+    Transcript show: 'Blenny server started on port ', port asString; cr.
+    Transcript show: 'HTML WebSocket: ws://localhost:', port asString, '/ws/html'; cr.
+    Transcript show: 'Data WebSocket: ws://localhost:', port asString, '/ws/data'; cr.
+    Transcript show: '========================================'; cr.
 ]
 
-{ #category : 'public' }
+{ #category : 'accessing' }
 BlennyWebApp >> stop [
-    "Completely stop the server and clean up"
-    
     server ifNotNil: [ 
         server stop.
         server := nil ].
     conduit ifNotNil: [ 
         conduit stop.
         conduit := nil ].
-    
-    "Force cleanup of any lingering servers"
-    ZnServer allInstancesDo: [ :s | 
-        s isRunning ifTrue: [ s stop ] ].
-    
-    Teapot stopAll.
-    Smalltalk garbageCollect.
-    
+    connectedClients removeAll.
     Transcript show: 'Blenny server stopped.'; cr.
-
 ]
