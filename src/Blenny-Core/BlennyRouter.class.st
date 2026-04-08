@@ -40,6 +40,40 @@ BlennyRouter >> handleRequest: request [
 	uri := request uri.
 	path := uri pathPrintString.
 	segments := uri segments asArray. "Ensure it's an array"
+	
+(path = '/login' and: [ request method = #GET ]) ifTrue: [
+    | query username password sessionId |
+    
+    Transcript show: '=== LOGIN START ==='; cr.
+    
+    query := request uri query.
+    Transcript show: 'Query: ', query asString; cr.
+    
+    username := query at: 'username' ifAbsent: [ nil ].
+    Transcript show: 'Username: ', (username ifNil: ['NIL']); cr.
+    
+    password := query at: 'password' ifAbsent: [ nil ].
+    Transcript show: 'Password: ', (password ifNil: ['NIL']); cr.
+    
+    username ifNil: [ 
+        Transcript show: 'Missing username'; cr.
+        ^ ZnResponse statusCode: 400 ].
+    password ifNil: [ 
+        Transcript show: 'Missing password'; cr.
+        ^ ZnResponse statusCode: 400 ].
+    
+    Transcript show: 'Calling authenticate...'; cr.
+    sessionId := webApp auth authenticate: username password: password.
+    Transcript show: 'SessionId result: ', (sessionId ifNil: ['NIL']); cr.
+    
+    sessionId ifNil: [ 
+        Transcript show: 'Authentication failed'; cr.
+        ^ ZnResponse statusCode: 401 ].
+    
+    Transcript show: 'Returning session ID'; cr.
+    ^ ZnResponse ok: (ZnEntity text: sessionId).
+].
+
 
 	"--- WebSocket Routes ---"
 	(segments notEmpty and: [ segments first = 'ws' ]) ifTrue: [
@@ -129,14 +163,7 @@ rootPath := aRootPath
 
 { #category : 'authentication' }
 BlennyRouter >> validateToken: aToken [
-    "Simple token validation - replace with database/auth service later"
-    aToken ifNil: [ ^ nil ].
-    
-    aToken = 'alice-token' ifTrue: [ ^ 'alice' ].
-    aToken = 'bob-token' ifTrue: [ ^ 'bob' ].
-    aToken = 'charlie-token' ifTrue: [ ^ 'charlie' ].
-    
-    ^ nil
+    ^ webApp auth validateSession: aToken
 ]
 
 { #category : 'accessing' }

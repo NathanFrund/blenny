@@ -9,7 +9,8 @@ Class {
 		'server',
 		'port',
 		'htmlBridge',
-		'dataBridge'
+		'dataBridge',
+		'auth'
 	],
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
@@ -24,6 +25,11 @@ BlennyWebApp >> announceStarted [
         nextPutAll: port asString;
         nextPutAll: ' (', mode, ' mode)';
         cr.
+]
+
+{ #category : 'initialization' }
+BlennyWebApp >> auth [
+	^ auth
 ]
 
 { #category : 'publishing' }
@@ -78,16 +84,10 @@ BlennyWebApp >> htmlBridge: aBridge [
 
 { #category : 'initialization' }
 BlennyWebApp >> initialize [
-    super initialize.
-    port := 8081.
-]
 
-{ #category : 'module-loading' }
-BlennyWebApp >> loadModulesInto: aDispatcher [
-    "Discover and load all modules"
-    (Smalltalk allClasses select: [ :cls |
-        cls includesBehavior: TBlennyModule ]) do: [ :moduleClass |
-            moduleClass registerRoutesOn: aDispatcher ].
+	super initialize.
+	port := 8081.
+	auth := BlennySimpleAuth new
 ]
 
 { #category : 'actions' }
