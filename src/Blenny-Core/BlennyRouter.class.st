@@ -40,39 +40,59 @@ BlennyRouter >> handleRequest: request [
 	uri := request uri.
 	path := uri pathPrintString.
 	segments := uri segments asArray. "Ensure it's an array"
-	
-(path = '/login' and: [ request method = #GET ]) ifTrue: [
-    | query username password sessionId |
-    
-    Transcript show: '=== LOGIN START ==='; cr.
-    
-    query := request uri query.
-    Transcript show: 'Query: ', query asString; cr.
-    
-    username := query at: 'username' ifAbsent: [ nil ].
-    Transcript show: 'Username: ', (username ifNil: ['NIL']); cr.
-    
-    password := query at: 'password' ifAbsent: [ nil ].
-    Transcript show: 'Password: ', (password ifNil: ['NIL']); cr.
-    
-    username ifNil: [ 
-        Transcript show: 'Missing username'; cr.
-        ^ ZnResponse statusCode: 400 ].
-    password ifNil: [ 
-        Transcript show: 'Missing password'; cr.
-        ^ ZnResponse statusCode: 400 ].
-    
-    Transcript show: 'Calling authenticate...'; cr.
-    sessionId := webApp auth authenticate: username password: password.
-    Transcript show: 'SessionId result: ', (sessionId ifNil: ['NIL']); cr.
-    
-    sessionId ifNil: [ 
-        Transcript show: 'Authentication failed'; cr.
-        ^ ZnResponse statusCode: 401 ].
-    
-    Transcript show: 'Returning session ID'; cr.
-    ^ ZnResponse ok: (ZnEntity text: sessionId).
-].
+
+	(path = '/login' and: [ request method = #GET ]) ifTrue: [
+			| query username password sessionId |
+			Transcript
+				show: '=== LOGIN START ===';
+				cr.
+
+			query := request uri query.
+			Transcript
+				show: 'Query: ' , query asString;
+				cr.
+
+			username := query at: 'username' ifAbsent: [ nil ].
+			Transcript
+				show: 'Username: ' , (username ifNil: [ 'NIL' ]);
+				cr.
+
+			password := query at: 'password' ifAbsent: [ nil ].
+			Transcript
+				show: 'Password: ' , (password ifNil: [ 'NIL' ]);
+				cr.
+
+			username ifNil: [
+					Transcript
+						show: 'Missing username';
+						cr.
+					^ ZnResponse statusCode: 400 ].
+			password ifNil: [
+					Transcript
+						show: 'Missing password';
+						cr.
+					^ ZnResponse statusCode: 400 ].
+
+			Transcript
+				show: 'Calling authenticate...';
+				cr.
+			sessionId := webApp authProvider
+				             authenticate: username
+				             password: password.
+			Transcript
+				show: 'SessionId result: ' , (sessionId ifNil: [ 'NIL' ]);
+				cr.
+
+			sessionId ifNil: [
+					Transcript
+						show: 'Authentication failed';
+						cr.
+					^ ZnResponse statusCode: 401 ].
+
+			Transcript
+				show: 'Returning session ID';
+				cr.
+			^ ZnResponse ok: (ZnEntity text: sessionId) ].
 
 
 	"--- WebSocket Routes ---"
@@ -84,10 +104,20 @@ BlennyRouter >> handleRequest: request [
 
 			"Extract and validate token"
 			token := request uri queryAt: 'token' ifAbsent: [ nil ].
-			Transcript show: 'Token received: ', (token ifNil: ['NIL']); cr.
-			
+			Transcript
+				show: 'Token received: ' , (token ifNil: [ 'NIL' ]);
+				cr.
+
+			token ifNil: [
+					Transcript
+						show: 'Authentication failed - missing token';
+						cr.
+					^ ZnResponse unauthorized: 'Missing token' ].
+
 			userId := self validateToken: token.
-			Transcript show: 'UserID from validation: ', (userId  ifNil: ['NIL']); cr.
+			Transcript
+				show: 'UserID from validation: ' , (userId ifNil: [ 'NIL' ]);
+				cr.
 
 			userId ifNil: [
 					Transcript
@@ -163,7 +193,7 @@ rootPath := aRootPath
 
 { #category : 'authentication' }
 BlennyRouter >> validateToken: aToken [
-    ^ webApp auth validateSession: aToken
+    ^ webApp authProvider validateToken: aToken
 ]
 
 { #category : 'accessing' }

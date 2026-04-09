@@ -5,23 +5,20 @@ Class {
 		'users',
 		'sessions'
 	],
-	#category : 'Blenny-Core',
-	#package : 'Blenny-Core'
+	#category : 'Blenny-Auth',
+	#package : 'Blenny-Auth'
 }
 
 { #category : 'as yet unclassified' }
-BlennySimpleAuth >> authenticate: aUsername password: aPassword [
-    | storedHash sessionId sessionDict |
-    storedHash := users at: aUsername ifAbsent: [ ^ nil ].
-    (self hashPassword: aPassword) = storedHash ifTrue: [
+BlennySimpleAuth >> authenticate: username password: password [
+    | storedHash sessionDict |
+    storedHash := users at: username ifAbsent: [ ^ nil ].
+    (self hashPassword: password) = storedHash ifTrue: [
+        | sessionId |
         sessionId := UUID new asString.
-        
-        "Create dictionary explicitly - use DateAndTime"
         sessionDict := Dictionary new.
-        sessionDict at: 'userId' put: aUsername.
-        sessionDict at: 'createdAt' put: DateAndTime now.
-        sessionDict at: 'expiresAt' put: DateAndTime now + (24 * 60 * 60). "24 hours in seconds"
-        
+        sessionDict at: 'userId' put: username.
+        sessionDict at: 'expiresAt' put: DateAndTime now + (24 * 60 * 60).
         sessions at: sessionId put: sessionDict.
         ^ sessionId ].
     ^ nil
@@ -72,12 +69,15 @@ BlennySimpleAuth >> userExists: aUsername [
 
 ]
 
-{ #category : 'as yet unclassified' }
-BlennySimpleAuth >> validateSession: aSessionId [
-    | session |
-    session := sessions at: aSessionId ifAbsent: [ ^ nil ].
-    (session at: 'expiresAt') <= DateAndTime now ifTrue: [
-        sessions removeKey: aSessionId ifAbsent: [].
-        ^ nil ].
-    ^ session at: 'userId'
+{ #category : 'authentication' }
+BlennySimpleAuth >> validateToken: token [
+
+	| session |
+	token ifNil: [ ^ nil ].
+	session := sessions at: token ifAbsent: [ ^ nil ].
+	(session at: 'expiresAt') <= DateAndTime now ifTrue: [
+			sessions removeKey: token ifAbsent: [ ].
+			^ nil ].
+
+	^ session at: 'userId'
 ]

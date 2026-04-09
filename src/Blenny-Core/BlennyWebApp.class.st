@@ -10,11 +10,22 @@ Class {
 		'port',
 		'htmlBridge',
 		'dataBridge',
-		'auth'
+		'authProvider'
 	],
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
 }
+
+{ #category : 'accessing' }
+BlennyWebApp class >> default [
+    "Convenience for quick start - uses SimpleAuth for development"
+    ^ self new initializeWithAuth: BlennySimpleAuth new.
+]
+
+{ #category : 'as yet unclassified' }
+BlennyWebApp class >> withAuth: anAuthProvider [
+    ^ self new initializeWithAuth: anAuthProvider
+]
 
 { #category : 'announcements' }
 BlennyWebApp >> announceStarted [
@@ -27,9 +38,9 @@ BlennyWebApp >> announceStarted [
         cr.
 ]
 
-{ #category : 'initialization' }
-BlennyWebApp >> auth [
-	^ auth
+{ #category : 'accessing' }
+BlennyWebApp >> authProvider [
+    ^ authProvider
 ]
 
 { #category : 'publishing' }
@@ -84,10 +95,15 @@ BlennyWebApp >> htmlBridge: aBridge [
 
 { #category : 'initialization' }
 BlennyWebApp >> initialize [
+    self initializeWithAuth: BlennySimpleAuth new.
 
-	super initialize.
-	port := 8081.
-	auth := BlennySimpleAuth new
+]
+
+{ #category : 'initialization' }
+BlennyWebApp >> initializeWithAuth: anAuthProvider [
+    "Initialize with a specific auth provider"
+    port := 8081.
+    authProvider := anAuthProvider.
 ]
 
 { #category : 'actions' }
