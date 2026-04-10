@@ -50,35 +50,38 @@ BlennyRouter >> handleNotFound: request [
 
 { #category : 'public' }
 BlennyRouter >> handleRequest: request [
-    | path |
-    path := request uri pathPrintString.
-    
-    "1. WebSocket and static routes (direct handlers)"
-    (path beginsWith: '/ws/') ifTrue: [ ^ self handleWebSocket: request ].
-    (path beginsWith: '/static/') ifTrue: [ ^ self handleStatic: request ].
-    
-    "2. Home route"
-    (path = '/' or: [ path isEmpty ]) ifTrue: [ 
-        ^ self ensureResponse: (renderer renderPage: 'index' context: Dictionary new) ].
-    
-    "3. Login routes"
-    (path = '/login' and: [ request method = #GET ]) ifTrue: [ 
-        ^ self ensureResponse: (loginHandler handleGet: request) ].
-    (path = '/login' and: [ request method = #POST ]) ifTrue: [ 
-        ^ self ensureResponse: (loginHandler handlePost: request) ].
-    
-    "4. Register routes"
-    (path = '/register' and: [ request method = #GET ]) ifTrue: [ 
-        ^ self ensureResponse: (registerHandler handleGet: request) ].
-    (path = '/register' and: [ request method = #POST ]) ifTrue: [ 
-        ^ self ensureResponse: (registerHandler handlePost: request) ].
-    
-    "5. Logout route"
-    (path = '/logout' and: [ request method = #POST ]) ifTrue: [ 
-        ^ self ensureResponse: (logoutHandler handlePost: request) ].
-    
-    "6. 404"
-    ^ ZnResponse notFound: path
+
+	| path |
+	path := request uri pathPrintString.
+
+	"1. WebSocket and static routes (direct handlers)"
+	(path beginsWith: '/ws/') ifTrue: [ ^ self handleWebSocket: request ].
+	(path beginsWith: '/static/') ifTrue: [ ^ self handleStatic: request ].
+
+	"2. Home route"
+	(path = '/' or: [ path isEmpty ]) ifTrue: [
+			^ self ensureResponse:
+				  (renderer renderPage: 'index' context: Dictionary new) ].
+
+	"3. Login routes"
+	(path = '/login' and: [ request method = #GET ]) ifTrue: [
+		^ self ensureResponse: (loginHandler handleGet: request) ].
+	(path = '/login' and: [ request method = #POST ]) ifTrue: [
+		^ self ensureResponse: (loginHandler handlePost: request) ].
+
+	"4. Register routes"
+	(path = '/register' and: [ request method = #GET ]) ifTrue: [
+		^ self ensureResponse: (registerHandler handleGet: request) ].
+	(path = '/register' and: [ request method = #POST ]) ifTrue: [
+		^ self ensureResponse: (registerHandler handlePost: request) ].
+
+	"5. Logout route - accept GET or POST"
+	(path = '/logout' and: [
+		 request method = #GET or: [ request method = #POST ] ]) ifTrue: [
+		^ self ensureResponse: (logoutHandler handlePost: request) ].
+
+	"6. 404"
+	^ ZnResponse notFound: path
 ]
 
 { #category : 'handlers' }

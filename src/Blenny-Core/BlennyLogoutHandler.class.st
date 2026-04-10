@@ -9,6 +9,12 @@ Class {
 }
 
 { #category : 'as yet unclassified' }
+BlennyLogoutHandler >> handleGet: request [
+    "Support GET for browser testing"
+    ^ self handlePost: request
+]
+
+{ #category : 'as yet unclassified' }
 BlennyLogoutHandler >> handlePost: request [
 
     | cookie sessionId |

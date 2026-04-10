@@ -48,7 +48,7 @@ BlennyLoginHandler >> redirectWithCookie: sessionId [
     | response cookie |
     
     "Corrected: Use 'redirect:' for a 302 Found response"
-    response := ZnResponse redirect: '/dashboard'.
+    response := ZnResponse redirect: '/'.
     
     "Use the proper Zinc cookie object"
     cookie := (ZnCookie name: 'session' value: sessionId)
