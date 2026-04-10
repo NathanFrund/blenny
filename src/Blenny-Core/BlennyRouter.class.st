@@ -2,12 +2,13 @@ Class {
 	#name : 'BlennyRouter',
 	#superclass : 'Object',
 	#instVars : [
-		'webApp',
 		'rootPath',
+		'renderer',
 		'htmlBridge',
 		'dataBridge',
-		'token',
-		'userId'
+		'loginHandler',
+		'logoutHandler',
+		'registerHandler'
 	],
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
@@ -33,44 +34,13 @@ BlennyRouter >> dataBridge: aBridge [
 	dataBridge := aBridge 
 ]
 
-{ #category : 'handlers' }
-BlennyRouter >> handleHome: request [
-    Transcript show: 'Matched Home'; cr.
-    ^ ZnResponse ok: (ZnEntity html: (webApp renderPage: 'index'))
-]
+{ #category : 'as yet unclassified' }
+BlennyRouter >> ensureResponse: anObject [
+    anObject ifNil: [ ^ ZnResponse serverError: 'Empty response from handler' ].
+    (anObject isKindOf: ZnResponse) ifTrue: [ ^ anObject ].
+    (anObject isString) ifTrue: [ ^ ZnResponse ok: (ZnEntity html: anObject) ].
+    ^ ZnResponse serverError: 'Handler returned invalid response type'
 
-{ #category : 'handlers' }
-BlennyRouter >> handleLogin: request [
-    | query username password sessionId |
-    
-    Transcript show: '=== LOGIN START ==='; cr.
-    
-    query := request uri query.
-    Transcript show: 'Query: ', query asString; cr.
-    
-    username := query at: 'username' ifAbsent: [ nil ].
-    Transcript show: 'Username: ', (username ifNil: ['NIL']); cr.
-    
-    password := query at: 'password' ifAbsent: [ nil ].
-    Transcript show: 'Password: ', (password ifNil: ['NIL']); cr.
-    
-    username ifNil: [ 
-        Transcript show: 'Missing username'; cr.
-        ^ ZnResponse statusCode: 400 ].
-    password ifNil: [ 
-        Transcript show: 'Missing password'; cr.
-        ^ ZnResponse statusCode: 400 ].
-    
-    Transcript show: 'Calling authenticate...'; cr.
-    sessionId := webApp authProvider authenticate: username password: password.
-    Transcript show: 'SessionId result: ', (sessionId ifNil: ['NIL']); cr.
-    
-    sessionId ifNil: [ 
-        Transcript show: 'Authentication failed'; cr.
-        ^ ZnResponse statusCode: 401 ].
-    
-    Transcript show: 'Returning session ID'; cr.
-    ^ ZnResponse ok: (ZnEntity text: sessionId)
 ]
 
 { #category : 'handlers' }
@@ -82,41 +52,41 @@ BlennyRouter >> handleNotFound: request [
 BlennyRouter >> handleRequest: request [
     | path |
     path := request uri pathPrintString.
-    Transcript show: 'Path: ', path; cr.
     
-    "Login"
-    (path = '/login' and: [ request method = #GET ]) ifTrue: [
-        Transcript show: '→ Login'; cr.
-        ^ self handleLogin: request ].
+    "1. WebSocket and static routes (direct handlers)"
+    (path beginsWith: '/ws/') ifTrue: [ ^ self handleWebSocket: request ].
+    (path beginsWith: '/static/') ifTrue: [ ^ self handleStatic: request ].
     
-    "WebSocket"
-    (path beginsWith: '/ws/') ifTrue: [
-        Transcript show: '→ WebSocket'; cr.
-        ^ self handleWebSocket: request ].
+    "2. Home route"
+    (path = '/' or: [ path isEmpty ]) ifTrue: [ 
+        ^ self ensureResponse: (renderer renderPage: 'index' context: Dictionary new) ].
     
-    "Home"
-    (path = '/' or: [ path isEmpty ]) ifTrue: [
-        Transcript show: '→ Home'; cr.
-        ^ self handleHome: request ].
+    "3. Login routes"
+    (path = '/login' and: [ request method = #GET ]) ifTrue: [ 
+        ^ self ensureResponse: (loginHandler handleGet: request) ].
+    (path = '/login' and: [ request method = #POST ]) ifTrue: [ 
+        ^ self ensureResponse: (loginHandler handlePost: request) ].
     
-    "Static"
-    (path beginsWith: '/static/') ifTrue: [
-        Transcript show: '→ Static'; cr.
-        ^ self handleStatic: request ].
+    "4. Register routes"
+    (path = '/register' and: [ request method = #GET ]) ifTrue: [ 
+        ^ self ensureResponse: (registerHandler handleGet: request) ].
+    (path = '/register' and: [ request method = #POST ]) ifTrue: [ 
+        ^ self ensureResponse: (registerHandler handlePost: request) ].
     
-    "404"
-    Transcript show: '→ 404'; cr.
-    ^ self handleNotFound: request
+    "5. Logout route"
+    (path = '/logout' and: [ request method = #POST ]) ifTrue: [ 
+        ^ self ensureResponse: (logoutHandler handlePost: request) ].
+    
+    "6. 404"
+    ^ ZnResponse notFound: path
 ]
 
 { #category : 'handlers' }
 BlennyRouter >> handleStatic: request [
-    | uri path segments diskFile subSegments |
-    uri := request uri.
-    path := uri pathPrintString.
-    segments := uri segments asArray.
-    subSegments := segments allButFirst.
-    diskFile := subSegments
+    | path segments diskFile |
+    path := request uri pathPrintString.
+    segments := request uri segments asArray.
+    diskFile := segments allButFirst
         inject: rootPath asFileReference
         into: [ :parent :segment | parent / segment ].
     
@@ -130,40 +100,24 @@ BlennyRouter >> handleStatic: request [
 
 { #category : 'handlers' }
 BlennyRouter >> handleWebSocket: request [
-    | segments token userId wsType bridge |
+    | token userId wsType bridge |
     
-    segments := request uri segments asArray.
-    wsType := (segments size > 1 and: [ segments second isString ])
-        ifTrue: [ segments second ]
+    wsType := (request uri segments size > 1 and: [ request uri segments second isString ])
+        ifTrue: [ request uri segments second ]
         ifFalse: [ 'html' ].
     
-    "Extract and validate token"
     token := request uri queryAt: 'token' ifAbsent: [ nil ].
-    Transcript show: 'Token received: ', (token ifNil: ['NIL']); cr.
+    token ifNil: [ ^ ZnResponse unauthorized: 'Missing token' ].
     
-    token ifNil: [
-        Transcript show: 'Authentication failed - missing token'; cr.
-        ^ ZnResponse unauthorized: 'Missing token' ].
-    
-    userId := webApp authProvider validateToken: token.
-    Transcript show: 'UserID from validation: ', (userId ifNil: ['NIL']); cr.
-    
-    userId ifNil: [
-        Transcript show: 'Authentication failed - invalid token: ', token; cr.
-        ^ ZnResponse unauthorized: 'Invalid or missing token' ].
+    "Use loginHandler's authProvider to validate token"
+    userId := loginHandler authProvider validateToken: token.
+    userId ifNil: [ ^ ZnResponse unauthorized: 'Invalid token' ].
     
     ((request headers at: 'Upgrade' ifAbsent: [ '' ]) asLowercase includesSubstring: 'websocket')
         ifFalse: [ ^ ZnResponse badRequest: request ].
     
-    Transcript show: 'WebSocket upgrade - User: ', userId, ' Type: ', wsType; cr.
-    
-    bridge := wsType = 'html'
-        ifTrue: [ htmlBridge ]
-        ifFalse: [ dataBridge ].
-    
-    bridge ifNil: [
-        Transcript show: 'ERROR: Bridge is nil for type: ', wsType; cr.
-        ^ ZnResponse serverError: 'WebSocket bridge not configured' ].
+    bridge := wsType = 'html' ifTrue: [ htmlBridge ] ifFalse: [ dataBridge ].
+    bridge ifNil: [ ^ ZnResponse serverError: 'Bridge not configured' ].
     
     ^ (ZnWebSocketDelegate handler: [ :webSocket |
         bridge handleWebSocket: webSocket forUser: userId ]) 
@@ -180,23 +134,19 @@ BlennyRouter >> htmlBridge: aBridge [
 	htmlBridge := aBridge
 ]
 
+{ #category : 'initialization' }
+BlennyRouter >> initializeWith: aDictionary [
+    renderer := aDictionary at: 'renderer'.
+    loginHandler := aDictionary at: 'loginHandler'.
+    registerHandler := aDictionary at: 'registerHandler'.
+    logoutHandler := aDictionary at: 'logoutHandler'.
+    htmlBridge := aDictionary at: 'htmlBridge'.
+    dataBridge := aDictionary at: 'dataBridge'.
+    rootPath := aDictionary at: 'rootPath' ifAbsent: [ nil ].
+]
+
 { #category : 'accessing' }
 BlennyRouter >> rootPath: aRootPath [
 
 rootPath := aRootPath 
-]
-
-{ #category : 'authentication' }
-BlennyRouter >> validateToken: aToken [
-    ^ webApp authProvider validateToken: aToken
-]
-
-{ #category : 'accessing' }
-BlennyRouter >> webApp [
-	^ webApp 
-]
-
-{ #category : 'accessing' }
-BlennyRouter >> webApp: aWebApp [
-	webApp := aWebApp 
 ]

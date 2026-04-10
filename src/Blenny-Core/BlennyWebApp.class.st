@@ -1,16 +1,18 @@
 Class {
 	#name : 'BlennyWebApp',
 	#superclass : 'Object',
-	#traits : 'TConduitRenderer + THtmxRenderer',
-	#classTraits : 'TConduitRenderer classTrait + THtmxRenderer classTrait',
 	#instVars : [
-		'conduit',
-		'rootPath',
 		'server',
 		'port',
+		'rootPath',
+		'conduit',
+		'authProvider',
+		'renderer',
+		'registerHandler',
+		'loginHandler',
+		'logoutHandler',
 		'htmlBridge',
-		'dataBridge',
-		'authProvider'
+		'dataBridge'
 	],
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
@@ -59,11 +61,6 @@ BlennyWebApp >> conduit [
 ]
 
 { #category : 'accessing' }
-BlennyWebApp >> conduit: aConduit [
-conduit := aConduit 
-]
-
-{ #category : 'accessing' }
 BlennyWebApp >> dataBridge [
 	^ dataBridge
 ]
@@ -95,7 +92,11 @@ BlennyWebApp >> htmlBridge: aBridge [
 
 { #category : 'initialization' }
 BlennyWebApp >> initialize [
-    self initializeWithAuth: BlennySimpleAuth new.
+    super initialize.
+    port := 8081.
+    authProvider := BlennySimpleAuth new.
+  
+
 
 ]
 
@@ -104,6 +105,11 @@ BlennyWebApp >> initializeWithAuth: anAuthProvider [
     "Initialize with a specific auth provider"
     port := 8081.
     authProvider := anAuthProvider.
+]
+
+{ #category : 'accessing' }
+BlennyWebApp >> renderer [ 
+	^ renderer 
 ]
 
 { #category : 'actions' }
@@ -165,22 +171,38 @@ BlennyWebApp >> startOn: aPath port: aPortNumber [
 BlennyWebApp >> startServer [
     | delegate |
     ZnServer allInstancesDo: [ :s | s port = port ifTrue: [ s stop ] ].
-
-"Create bridges"
+    
+    "Create bridges"
     htmlBridge := BlennyAnnouncerBridge new initializeWithEndpoint: 'html'.
     dataBridge := BlennyAnnouncerBridge new initializeWithEndpoint: 'data'.
     
-    delegate := BlennyRouter new
-        rootPath: rootPath;
-			htmlBridge: htmlBridge;
-			dataBridge: dataBridge ;
-        webApp: self.
+    "Create renderer (conduit is now available)"
+    renderer := BlennyRenderer new 
+        initializeWithConduit: conduit rootPath: rootPath.
+    
+    "Create handlers"
+    registerHandler := BlennyRegisterHandler new 
+        initializeWithAuth: authProvider renderer: renderer.
+    loginHandler := BlennyLoginHandler new 
+        initializeWithAuth: authProvider renderer: renderer.
+    logoutHandler := BlennyLogoutHandler new 
+        initializeWithAuth: authProvider.
+    
+    "Create router with ALL dependencies injected"
+    delegate := BlennyRouter new initializeWith: {
+        'renderer' -> renderer.
+        'loginHandler' -> loginHandler.
+        'registerHandler' -> registerHandler.
+        'logoutHandler' -> logoutHandler.
+        'htmlBridge' -> htmlBridge.
+        'dataBridge' -> dataBridge.
+        'rootPath' -> rootPath.
+    } asDictionary.
     
     server := (ZnServer on: port)
         delegate: delegate;
         start.
-
-"Store bridges for later use"
+    
     self htmlBridge: htmlBridge.
     self dataBridge: dataBridge.
     
