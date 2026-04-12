@@ -92,12 +92,10 @@ BlennyWebApp >> htmlBridge: aBridge [
 
 { #category : 'initialization' }
 BlennyWebApp >> initialize [
-    super initialize.
-    port := 8081.
-    authProvider := BlennySimpleAuth new.
-  
 
-
+	super initialize.
+	port := BlennyConfig current at: 'port' ifAbsent: [ 8081 ].
+	authProvider := BlennySimpleAuth new
 ]
 
 { #category : 'initialization' }
@@ -169,48 +167,67 @@ BlennyWebApp >> startOn: aPath port: aPortNumber [
 
 { #category : 'as yet unclassified' }
 BlennyWebApp >> startServer [
-    | delegate |
-    ZnServer allInstancesDo: [ :s | s port = port ifTrue: [ s stop ] ].
-    
-    "Create bridges"
-    htmlBridge := BlennyAnnouncerBridge new initializeWithEndpoint: 'html'.
-    dataBridge := BlennyAnnouncerBridge new initializeWithEndpoint: 'data'.
-    
-    "Create renderer (conduit is now available)"
-    renderer := BlennyRenderer new 
-        initializeWithConduit: conduit rootPath: rootPath.
-    
-    "Create handlers"
-    registerHandler := BlennyRegisterHandler new 
-        initializeWithAuth: authProvider renderer: renderer.
-    loginHandler := BlennyLoginHandler new 
-        initializeWithAuth: authProvider renderer: renderer.
-    logoutHandler := BlennyLogoutHandler new 
-        initializeWithAuth: authProvider.
-    
-    "Create router with ALL dependencies injected"
-    delegate := BlennyRouter new initializeWith: {
-        'renderer' -> renderer.
-        'loginHandler' -> loginHandler.
-        'registerHandler' -> registerHandler.
-        'logoutHandler' -> logoutHandler.
-        'htmlBridge' -> htmlBridge.
-        'dataBridge' -> dataBridge.
-        'rootPath' -> rootPath.
-    } asDictionary.
-    
-    server := (ZnServer on: port)
-        delegate: delegate;
-        start.
-    
-    self htmlBridge: htmlBridge.
-    self dataBridge: dataBridge.
-    
-    Transcript show: '========================================'; cr.
-    Transcript show: 'Blenny server started on port ', port asString; cr.
-    Transcript show: 'HTML WebSocket: ws://localhost:', port asString, '/ws/html'; cr.
-    Transcript show: 'Data WebSocket: ws://localhost:', port asString, '/ws/data'; cr.
-    Transcript show: '========================================'; cr.
+
+	| delegate bindAddress |
+	ZnServer allInstancesDo: [ :s | s port = port ifTrue: [ s stop ] ].
+
+	bindAddress := BlennyConfig current bindAddress.
+
+	"Create bridges"
+	htmlBridge := BlennyAnnouncerBridge new initializeWithEndpoint:
+		              'html'.
+	dataBridge := BlennyAnnouncerBridge new initializeWithEndpoint:
+		              'data'.
+
+	"Create renderer (conduit is now available)"
+	renderer := BlennyRenderer new
+		            initializeWithConduit: conduit
+		            rootPath: rootPath.
+
+	"Create handlers"
+	registerHandler := BlennyRegisterHandler new
+		                   initializeWithAuth: authProvider
+		                   renderer: renderer.
+	loginHandler := BlennyLoginHandler new
+		                initializeWithAuth: authProvider
+		                renderer: renderer.
+	logoutHandler := BlennyLogoutHandler new initializeWithAuth:
+		                 authProvider.
+
+	"Create router with ALL dependencies injected"
+	delegate := BlennyRouter new initializeWith: {
+			            ('renderer' -> renderer).
+			            ('loginHandler' -> loginHandler).
+			            ('registerHandler' -> registerHandler).
+			            ('logoutHandler' -> logoutHandler).
+			            ('htmlBridge' -> htmlBridge).
+			            ('dataBridge' -> dataBridge).
+			            ('rootPath' -> rootPath) } asDictionary.
+
+	server := ZnServer on: port.
+	server bindingAddress:
+		(NetNameResolver addressForName: bindAddress) asByteArray.
+	server delegate: delegate.
+	server start.
+
+	self htmlBridge: htmlBridge.
+	self dataBridge: dataBridge.
+
+	Transcript
+		show: '========================================';
+		cr.
+	Transcript
+		show: 'Blenny server started on port ' , port asString;
+		cr.
+	Transcript
+		show: 'HTML WebSocket: ws://localhost:' , port asString , '/ws/html';
+		cr.
+	Transcript
+		show: 'Data WebSocket: ws://localhost:' , port asString , '/ws/data';
+		cr.
+	Transcript
+		show: '========================================';
+		cr
 ]
 
 { #category : 'accessing' }
