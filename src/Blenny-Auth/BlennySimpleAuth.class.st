@@ -94,8 +94,6 @@ BlennySimpleAuth >> initialize [
     self setupTestUsers.
     self cleanupBlacklist.  "Clean on startup"
     self startBlacklistJanitor.
-
-	Smalltalk addToShutDownList: self.
 ]
 
 { #category : 'jwt' }
