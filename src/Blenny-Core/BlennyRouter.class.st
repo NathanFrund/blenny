@@ -14,16 +14,6 @@ Class {
 	#package : 'Blenny-Core'
 }
 
-{ #category : 'as yet unclassified' }
-BlennyRouter >> authenticatedUserIdFrom: request [
-    "Implement based on your session/auth system"
-    "This is a placeholder - replace with your actual auth logic"
-    | session |
-    session := request cookieAt: 'session' ifAbsent: [ ^ nil ].
-    "Validate session and return user ID"
-    ^ session  "Return user ID or nil"
-]
-
 { #category : 'accessing' }
 BlennyRouter >> cookieAt: aKey from: request [
     "Extract cookie value from request"

@@ -238,5 +238,9 @@ BlennyWebApp >> stop [
     conduit ifNotNil: [ 
         conduit stop.
         conduit := nil ].
+
+	"Stop auth janitor"
+    authProvider shutdown.
+
     Transcript show: 'Blenny server stopped.'; cr.
 ]

@@ -94,6 +94,8 @@ BlennySimpleAuth >> initialize [
     self setupTestUsers.
     self cleanupBlacklist.  "Clean on startup"
     self startBlacklistJanitor.
+
+	Smalltalk addToShutDownList: self.
 ]
 
 { #category : 'jwt' }
@@ -122,6 +124,18 @@ BlennySimpleAuth >> setupTestUsers [
     users at: 'alice' put: (self hashPassword: 'secret').
     users at: 'bob' put: (self hashPassword: 'secret').
     users at: 'charlie' put: (self hashPassword: 'secret').
+]
+
+{ #category : 'system startup' }
+BlennySimpleAuth >> shutDown [
+    "Pharo system hook - called on image shutdown"
+    self shutdown.
+]
+
+{ #category : 'as yet unclassified' }
+BlennySimpleAuth >> shutdown [
+    "Clean up background processes"
+    self stopBlacklistJanitor.
 ]
 
 { #category : 'blacklist' }
