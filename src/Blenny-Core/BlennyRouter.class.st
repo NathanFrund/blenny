@@ -25,6 +25,20 @@ BlennyRouter >> authenticatedUserIdFrom: request [
 ]
 
 { #category : 'accessing' }
+BlennyRouter >> cookieAt: aKey from: request [
+    "Extract cookie value from request"
+    | cookieHeader cookies |
+    cookieHeader := request headers at: 'Cookie' ifAbsent: [ ^ nil ].
+    cookies := Dictionary new.
+    (cookieHeader splitOn: '; ') do: [ :pair |
+        | key value |
+        key := (pair copyUpTo: $=).
+        value := (pair copyAfter: $=).
+        cookies at: key put: value ].
+    ^ cookies at: aKey ifAbsent: [ nil ]
+]
+
+{ #category : 'accessing' }
 BlennyRouter >> dataBridge [
 	^ dataBridge
 ]
@@ -41,6 +55,15 @@ BlennyRouter >> ensureResponse: anObject [
     (anObject isString) ifTrue: [ ^ ZnResponse ok: (ZnEntity html: anObject) ].
     ^ ZnResponse serverError: 'Handler returned invalid response type'
 
+]
+
+{ #category : 'as yet unclassified' }
+BlennyRouter >> extractTokenFrom: request [
+    "Extract JWT token from URL or cookie"
+    | token |
+    token := request uri queryAt: 'token' ifAbsent: [ nil ].
+    token ifNil: [ token := self cookieAt: 'session' from: request ].
+    ^ token
 ]
 
 { #category : 'handlers' }
@@ -109,10 +132,9 @@ BlennyRouter >> handleWebSocket: request [
         ifTrue: [ request uri segments second ]
         ifFalse: [ 'html' ].
     
-    token := request uri queryAt: 'token' ifAbsent: [ nil ].
+    token := self extractTokenFrom: request.
     token ifNil: [ ^ ZnResponse unauthorized: 'Missing token' ].
     
-    "Use loginHandler's authProvider to validate token"
     userId := loginHandler authProvider validateToken: token.
     userId ifNil: [ ^ ZnResponse unauthorized: 'Invalid token' ].
     
