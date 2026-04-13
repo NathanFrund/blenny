@@ -95,12 +95,17 @@ BlennyAnnouncerBridge >> handleWebSocket: aWebSocket forUser: aUserId [
     "Add client to this bridge"
     clientInfo := self addClient: aWebSocket forUser: aUserId.
     
-    "Start the read loop"
-    [ aWebSocket runWith: [ :message |
-        message ifNotNil: [
-            Transcript show: aUserId, ' [', endpoint, ']: ', message asString; cr.
-            aWebSocket sendMessage: 'Echo: ', message asString ] ] ]
-    ensure: [
+    "Start the read loop with ConnectionClosed suppression"
+    [ 
+        [ aWebSocket runWith: [ :message |
+            message ifNotNil: [
+                Transcript show: aUserId, ' [', endpoint, ']: ', message asString; cr.
+                aWebSocket sendMessage: 'Echo: ', message asString ] ] ]
+        on: ConnectionClosed, Error
+        do: [ :ex | 
+            (ex isKindOf: ConnectionClosed) ifTrue: [ ^ self ].
+            Transcript show: 'WebSocket error: ', ex description; cr ]
+    ] ensure: [
         "Cleanup on disconnect"
         self removeClient: aWebSocket forUser: aUserId ]
 ]
