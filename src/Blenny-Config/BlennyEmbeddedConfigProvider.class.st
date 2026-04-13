@@ -12,29 +12,16 @@ BlennyEmbeddedConfigProvider >> at: aKey [
 
 { #category : 'instance creation' }
 BlennyEmbeddedConfigProvider >> defaults [
-	"Embedded defaults - compiled into the image"
 
 	^ {
-		  ('jwt_secret' -> 'CHANGE-ME-EMBEDDED-DEFAULT').
-		  ('port' -> 8081).
-		  ('bind_address' -> '127.0.0.1').
-		  ('dev_mode' -> true).
-		  ('show_config_warning' -> true) } asDictionary
+		  ('server.port' -> 8081).
+		  ('server.bind_address' -> '0.0.0.0').
+		  ('auth.jwt_secret' -> 'CHANGE-ME-EMBEDDED-DEFAULT').
+		  ('auth.session_duration_hours' -> 720).
+		  ('dev_mode' -> true) } asDictionary
 ]
 
 { #category : 'testing' }
 BlennyEmbeddedConfigProvider >> hasConfig [
     ^ true
-]
-
-{ #category : 'instance creation' }
-BlennyEmbeddedConfigProvider >> sdefaults [
-	"Embedded defaults - compiled into the image"
-
-	^ {
-		  ('jwt_secret' -> 'CHANGE-ME-EMBEDDED-DEFAULT').
-		  ('port' -> 8081).
-		  ('bind_address' -> '127.0.0.1').
-		  ('dev_mode' -> true).
-		  ('show_config_warning' -> true) } asDictionary
 ]

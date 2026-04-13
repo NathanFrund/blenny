@@ -34,20 +34,22 @@ BlennyConfig >> at: aKey ifAbsent: aBlock [
     ^ value ifNil: aBlock
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'convenience' }
 BlennyConfig >> bindAddress [
     "Return bind_address string"
-    ^ self at: 'bind_address' ifAbsent: [ '0.0.0.0' ]
+    ^ self at: 'server.bind_address'
+]
+
+{ #category : 'accessing' }
+BlennyConfig >> booleanAt: aKey [
+    | value |
+    value := self at: aKey.
+    ^ value = true or: [ value asString asLowercase = 'true' ]
 ]
 
 { #category : 'accessing' }
 BlennyConfig >> devMode [
-    ^ provider booleanAt: 'dev_mode'
-]
-
-{ #category : 'accessing' }
-BlennyConfig >> host [
-    ^ provider stringAt: 'host'
+    ^ self booleanAt: 'dev_mode'
 ]
 
 { #category : 'initialization' }
@@ -56,14 +58,14 @@ BlennyConfig >> initialize [
     self showStartupWarning.
 ]
 
-{ #category : 'accessing' }
+{ #category : 'convenience' }
 BlennyConfig >> jwtSecret [
-    ^ provider stringAt: 'jwt_secret'
+    ^ self at: 'auth.jwt_secret'
 ]
 
-{ #category : 'accessing' }
+{ #category : 'convenience' }
 BlennyConfig >> port [
-    ^ provider integerAt: 'port'
+    ^ self at: 'server.port'
 ]
 
 { #category : 'accessing' }
@@ -72,7 +74,7 @@ BlennyConfig >> provider [
     ^ provider
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'accessing' }
 BlennyConfig >> providerClass [
     "Return the class name of the active provider"
     ^ provider class name
@@ -91,6 +93,13 @@ BlennyConfig >> selectProvider [
     (BlennyEnvConfigProvider new hasConfig) ifTrue: [ ^ BlennyEnvConfigProvider new ].
     (BlennyFileConfigProvider new hasConfig) ifTrue: [ ^ BlennyFileConfigProvider new ].
     ^ BlennyEmbeddedConfigProvider new.
+]
+
+{ #category : 'convenience' }
+BlennyConfig >> sessionDuration [
+    | hours |
+    hours := self at: 'auth.session_duration_hours'.
+    ^ hours * 60 * 60
 ]
 
 { #category : 'initialization' }
