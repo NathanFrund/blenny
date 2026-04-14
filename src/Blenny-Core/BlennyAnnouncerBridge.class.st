@@ -110,6 +110,11 @@ BlennyAnnouncerBridge >> directHtml: aPayload to: aUserId [
                 Transcript show: 'HTML direct failed: ', ex description; cr ] ]
 ]
 
+{ #category : 'accessing' }
+BlennyAnnouncerBridge >> endpoint [ 
+	^ endpoint 
+]
+
 { #category : 'handling' }
 BlennyAnnouncerBridge >> handleWebSocket: aWebSocket forUser: aUserId [
     | clientInfo |
@@ -174,6 +179,11 @@ BlennyAnnouncerBridge >> initializeWithEndpoint: aString [
 
     ^ self
 
+]
+
+{ #category : 'accessing' }
+BlennyAnnouncerBridge >> isRunning [ 
+	^ isRunning 
 ]
 
 { #category : 'publishing' }

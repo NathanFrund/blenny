@@ -29,11 +29,28 @@ BlennySimpleAuthTest >> testAuthenticateValidUser [
 ]
 
 { #category : 'tests' }
+BlennySimpleAuthTest >> testBlacklistCleanup [
+    "Test that expired blacklist entries are removed"
+    | auth |
+    auth := BlennySimpleAuth new.
+    auth blacklist at: 'test-jti' put: DateAndTime now - 1 hour.
+    auth cleanupBlacklist.
+    self assert: (auth blacklist includesKey: 'test-jti') equals: false.
+]
+
+{ #category : 'tests' }
 BlennySimpleAuthTest >> testCreateUser [
     self assert: (auth createUser: 'newuser' password: 'pass').
     self assert: (auth userExists: 'newuser').
     self assert: (auth createUser: 'newuser' password: 'pass') equals: false.
 
+]
+
+{ #category : 'tests' }
+BlennySimpleAuthTest >> testInvalidTokenFormat [
+    | userId |
+    userId := auth validateToken: 'not.a.valid.jwt'.
+    self assert: userId equals: nil.
 ]
 
 { #category : 'tests' }
@@ -43,6 +60,34 @@ BlennySimpleAuthTest >> testLogout [
     auth logout: token.
     userId := auth validateToken: token.
     self assert: userId equals: nil.
+]
+
+{ #category : 'tests' }
+BlennySimpleAuthTest >> testTamperedToken [
+    "Test that a tampered token is rejected"
+    | token userId parts tampered |
+    token := auth authenticate: 'alice' password: 'secret'.
+    
+    "Split into header, payload, signature"
+    parts := token splitOn: '.'.
+    
+    "Modify the payload (second part) by changing a character"
+    "This corrupts the base64 encoding"
+    tampered := parts first, '.', (parts second copyReplaceAll: 'i' with: 'x'), '.', parts third.
+    
+    userId := auth validateToken: tampered.
+    self assert: userId equals: nil.
+
+]
+
+{ #category : 'tests' }
+BlennySimpleAuthTest >> testTokenExpiration [
+    "Test that expired tokens are rejected"
+    | token userId |
+    "Create a token that expires in 1 second"
+    "This requires modifying createJwtForUser to accept duration"
+    "Or test with a token that's already expired"
+    self skip.
 ]
 
 { #category : 'tests' }

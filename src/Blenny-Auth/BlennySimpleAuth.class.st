@@ -31,6 +31,11 @@ BlennySimpleAuth >> authenticate: username password: password [
     ^ nil
 ]
 
+{ #category : 'accessing' }
+BlennySimpleAuth >> blacklist [
+	^ blacklist 
+]
+
 { #category : 'blacklist' }
 BlennySimpleAuth >> cleanupBlacklist [
     "Remove expired entries from blacklist"
