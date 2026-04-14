@@ -8,7 +8,8 @@ Class {
 		'dataBridge',
 		'loginHandler',
 		'logoutHandler',
-		'registerHandler'
+		'registerHandler',
+		'routes'
 	],
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
@@ -66,34 +67,39 @@ BlennyRouter >> handleRequest: request [
 
 	| path |
 	path := request uri pathPrintString.
+	
+	"1. Check module-registered routes first"
+    routes do: [ :route |
+        (path = (route at: 'path') and: [ request method = (route at: 'method') ]) ifTrue: [
+            ^ self ensureResponse: ((route at: 'handler') value: request) ] ].
 
-	"1. WebSocket and static routes (direct handlers)"
+	"2. WebSocket and static routes (direct handlers)"
 	(path beginsWith: '/ws/') ifTrue: [ ^ self handleWebSocket: request ].
 	(path beginsWith: '/static/') ifTrue: [ ^ self handleStatic: request ].
 
-	"2. Home route"
+	"3. Home route"
 	(path = '/' or: [ path isEmpty ]) ifTrue: [
 			^ self ensureResponse:
 				  (renderer renderPage: 'index' context: Dictionary new) ].
 
-	"3. Login routes"
+	"4. Login routes"
 	(path = '/login' and: [ request method = #GET ]) ifTrue: [
 		^ self ensureResponse: (loginHandler handleGet: request) ].
 	(path = '/login' and: [ request method = #POST ]) ifTrue: [
 		^ self ensureResponse: (loginHandler handlePost: request) ].
 
-	"4. Register routes"
+	"5. Register routes"
 	(path = '/register' and: [ request method = #GET ]) ifTrue: [
 		^ self ensureResponse: (registerHandler handleGet: request) ].
 	(path = '/register' and: [ request method = #POST ]) ifTrue: [
 		^ self ensureResponse: (registerHandler handlePost: request) ].
 
-	"5. Logout route - accept GET or POST"
+	"6. Logout route - accept GET or POST"
 	(path = '/logout' and: [
 		 request method = #GET or: [ request method = #POST ] ]) ifTrue: [
 		^ self ensureResponse: (logoutHandler handlePost: request) ].
 
-	"6. 404"
+	"7. 404"
 	^ ZnResponse notFound: path
 ]
 
@@ -151,17 +157,44 @@ BlennyRouter >> htmlBridge: aBridge [
 
 { #category : 'initialization' }
 BlennyRouter >> initializeWith: aDictionary [
-    renderer := aDictionary at: 'renderer'.
-    loginHandler := aDictionary at: 'loginHandler'.
-    registerHandler := aDictionary at: 'registerHandler'.
-    logoutHandler := aDictionary at: 'logoutHandler'.
-    htmlBridge := aDictionary at: 'htmlBridge'.
-    dataBridge := aDictionary at: 'dataBridge'.
-    rootPath := aDictionary at: 'rootPath' ifAbsent: [ nil ].
+
+	renderer := aDictionary at: 'renderer'.
+	loginHandler := aDictionary at: 'loginHandler'.
+	registerHandler := aDictionary at: 'registerHandler'.
+	logoutHandler := aDictionary at: 'logoutHandler'.
+	htmlBridge := aDictionary at: 'htmlBridge'.
+	dataBridge := aDictionary at: 'dataBridge'.
+	rootPath := aDictionary at: 'rootPath' ifAbsent: [ nil ].
+	routes := OrderedCollection new
+]
+
+{ #category : 'as yet unclassified' }
+BlennyRouter >> registerGet: aPath handler: aBlock [
+    "Register a GET route"
+    routes add: { 
+        'method' -> #GET. 
+        'path' -> aPath. 
+        'handler' -> aBlock 
+    } asDictionary.
+]
+
+{ #category : 'as yet unclassified' }
+BlennyRouter >> registerPost: aPath handler: aBlock [
+    "Register a POST route"
+    routes add: { 
+        'method' -> #POST. 
+        'path' -> aPath. 
+        'handler' -> aBlock 
+    } asDictionary.
 ]
 
 { #category : 'accessing' }
 BlennyRouter >> rootPath: aRootPath [
 
 rootPath := aRootPath 
+]
+
+{ #category : 'accessing' }
+BlennyRouter >> routes [ 
+	^ routes.
 ]

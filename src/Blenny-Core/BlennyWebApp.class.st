@@ -12,7 +12,9 @@ Class {
 		'loginHandler',
 		'logoutHandler',
 		'htmlBridge',
-		'dataBridge'
+		'dataBridge',
+		'modules',
+		'router'
 	],
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
@@ -80,6 +82,12 @@ BlennyWebApp >> directHtml: aString toUser: aUserId [
     self htmlBridge publish: (BlennyHTMLDirect payload: aString toUser: aUserId)
 ]
 
+{ #category : 'modules' }
+BlennyWebApp >> discoverModules [
+    "Find all classes that use TBlennyModule"
+    ^ TBlennyModule users
+]
+
 { #category : 'accessing' }
 BlennyWebApp >> htmlBridge [
 	^ htmlBridge 
@@ -95,7 +103,8 @@ BlennyWebApp >> initialize [
 
 	super initialize.
 	port := BlennyConfig current at: 'port' ifAbsent: [ 8081 ].
-	authProvider := BlennySimpleAuth new
+	authProvider := BlennySimpleAuth new.
+	modules := OrderedCollection new.
 ]
 
 { #category : 'initialization' }
@@ -105,9 +114,37 @@ BlennyWebApp >> initializeWithAuth: anAuthProvider [
     authProvider := anAuthProvider.
 ]
 
+{ #category : 'modules' }
+BlennyWebApp >> loadModule: aModuleClass [
+    | module |
+    module := aModuleClass new.
+    module initializeModule.
+    modules add: module.
+    Transcript show: 'Loaded module: ', module moduleName; cr.
+]
+
+{ #category : 'modules' }
+BlennyWebApp >> loadModules [
+    "Load and initialize all discovered modules"
+    modules := OrderedCollection new.
+    self discoverModules do: [ :moduleClass |
+        self loadModule: moduleClass ]
+]
+
+{ #category : 'modules' }
+BlennyWebApp >> registerModulesWithRouter: aRouter [
+    modules do: [ :module |
+        module registerRoutesOn: aRouter ]
+]
+
 { #category : 'accessing' }
 BlennyWebApp >> renderer [ 
 	^ renderer 
+]
+
+{ #category : 'accessing' }
+BlennyWebApp >> router [
+	^ router 
 ]
 
 { #category : 'actions' }
@@ -130,6 +167,11 @@ BlennyWebApp >> serveFrozenAsset: aPathString [
     ^ ZnResponse notFound: aPathString
 ]
 
+{ #category : 'accessing' }
+BlennyWebApp >> server [
+	^ server
+]
+
 { #category : 'private' }
 BlennyWebApp >> setModeFromPath: aPath [
     aPath ifNil: [ 
@@ -147,6 +189,11 @@ BlennyWebApp >> setupDiskWatcher [
     templatesPath exists ifFalse: [ ^ self ].
     conduit := Conduit pointingAt: templatesPath pathString.
     conduit start.
+]
+
+{ #category : 'modules' }
+BlennyWebApp >> startModules [
+    modules do: [ :module | module startModule ]
 ]
 
 { #category : 'public' }
@@ -168,7 +215,7 @@ BlennyWebApp >> startOn: aPath port: aPortNumber [
 { #category : 'as yet unclassified' }
 BlennyWebApp >> startServer [
 
-	| delegate bindAddress |
+	| bindAddress |
 	ZnServer allInstancesDo: [ :s | s port = port ifTrue: [ s stop ] ].
 
 	bindAddress := BlennyConfig current bindAddress.
@@ -194,20 +241,31 @@ BlennyWebApp >> startServer [
 	logoutHandler := BlennyLogoutHandler new initializeWithAuth:
 		                 authProvider.
 
+
+	"===== MODULE LOADING ====="
+	self loadModules. "← Discover and instantiate modules"
+	self startModules. "← Call startModule on each"
+	"========================="
+
 	"Create router with ALL dependencies injected"
-	delegate := BlennyRouter new initializeWith: {
-			            ('renderer' -> renderer).
-			            ('loginHandler' -> loginHandler).
-			            ('registerHandler' -> registerHandler).
-			            ('logoutHandler' -> logoutHandler).
-			            ('htmlBridge' -> htmlBridge).
-			            ('dataBridge' -> dataBridge).
-			            ('rootPath' -> rootPath) } asDictionary.
+	router := BlennyRouter new initializeWith: {
+			          ('renderer' -> renderer).
+			          ('loginHandler' -> loginHandler).
+			          ('registerHandler' -> registerHandler).
+			          ('logoutHandler' -> logoutHandler).
+			          ('htmlBridge' -> htmlBridge).
+			          ('dataBridge' -> dataBridge).
+			          ('rootPath' -> rootPath) } asDictionary.
+
+	"===== REGISTER MODULES WITH ROUTER ====="
+	self registerModulesWithRouter: router.
+	"========================================"
+
 
 	server := ZnServer on: port.
 	server bindingAddress:
 		(NetNameResolver addressForName: bindAddress) asByteArray.
-	server delegate: delegate.
+	server delegate: router.
 	server start.
 
 	self htmlBridge: htmlBridge.
@@ -232,9 +290,21 @@ BlennyWebApp >> startServer [
 
 { #category : 'accessing' }
 BlennyWebApp >> stop [
+
+	"Stop modules first (so they can clean up)"
+    modules do: [ :module | module stopModule ].
+    
+    "Stop bridges (close WebSocket connections)"
+    htmlBridge ifNotNil: [ htmlBridge stop ].
+    dataBridge ifNotNil: [ dataBridge stop ].
+
+
+	"Stop HTTP server"
     server ifNotNil: [ 
         server stop.
         server := nil ].
+
+	"Stop Conduit file watcher"
     conduit ifNotNil: [ 
         conduit stop.
         conduit := nil ].
@@ -243,4 +313,9 @@ BlennyWebApp >> stop [
     authProvider shutdown.
 
     Transcript show: 'Blenny server stopped.'; cr.
+]
+
+{ #category : 'modules' }
+BlennyWebApp >> stopModules [
+    modules do: [ :module | module stopModule ]
 ]
