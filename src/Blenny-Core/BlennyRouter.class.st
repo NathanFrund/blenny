@@ -1,3 +1,21 @@
+"
+I am the HTTP request router for Blenny.
+
+I handle:
+- Routing HTTP requests to handlers
+- WebSocket upgrade requests
+- Static file serving
+- Module-registered routes
+- Authentication via cookie/URL token
+
+Routes are checked in this order:
+1. Module-registered routes (registerGet:/registerPost:)
+2. WebSocket (/ws/*)
+3. Static files (/static/*)
+4. Home (/)
+5. Login/Register/Logout
+6. 404
+"
 Class {
 	#name : 'BlennyRouter',
 	#superclass : 'Object',
@@ -15,7 +33,7 @@ Class {
 	#package : 'Blenny-Core'
 }
 
-{ #category : 'accessing' }
+{ #category : 'authentication' }
 BlennyRouter >> cookieAt: aKey from: request [
     "Extract cookie value from request"
     | cookieHeader cookies |
@@ -39,7 +57,7 @@ BlennyRouter >> dataBridge: aBridge [
 	dataBridge := aBridge 
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'authentication' }
 BlennyRouter >> ensureResponse: anObject [
     anObject ifNil: [ ^ ZnResponse serverError: 'Empty response from handler' ].
     (anObject isKindOf: ZnResponse) ifTrue: [ ^ anObject ].
@@ -48,7 +66,7 @@ BlennyRouter >> ensureResponse: anObject [
 
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'authentication' }
 BlennyRouter >> extractTokenFrom: request [
     "Extract JWT token from URL or cookie"
     | token |
@@ -62,7 +80,7 @@ BlennyRouter >> handleNotFound: request [
     ^ ZnResponse notFound: request uri pathPrintString
 ]
 
-{ #category : 'public' }
+{ #category : 'handlers' }
 BlennyRouter >> handleRequest: request [
 
 	| path |
@@ -168,7 +186,7 @@ BlennyRouter >> initializeWith: aDictionary [
 	routes := OrderedCollection new
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'module-registration' }
 BlennyRouter >> registerGet: aPath handler: aBlock [
     "Register a GET route"
     routes add: { 
@@ -178,7 +196,7 @@ BlennyRouter >> registerGet: aPath handler: aBlock [
     } asDictionary.
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'module-registration' }
 BlennyRouter >> registerPost: aPath handler: aBlock [
     "Register a POST route"
     routes add: { 

@@ -1,3 +1,26 @@
+"
+I handle user login requests (GET and POST).
+
+GET /login  - Display the login form
+POST /login - Process login credentials, set JWT cookie, redirect to /
+
+My responsibilities:
+- Render the login page (GET)
+- Validate username/password via authProvider
+- Create JWT token on successful authentication
+- Set secure HttpOnly cookie with the token
+- Redirect to home page on success
+- Render error messages on failure
+
+I am created by BlennyWebApp with:
+    loginHandler := BlennyLoginHandler new
+        initializeWithAuth: authProvider
+        renderer: renderer.
+
+Usage:
+    handler handleGet: request.   ""Show form""
+    handler handlePost: request.  ""Process login""
+"
 Class {
 	#name : 'BlennyLoginHandler',
 	#superclass : 'Object',
@@ -14,12 +37,12 @@ BlennyLoginHandler >> authProvider [
 	^ authProvider 
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'handling' }
 BlennyLoginHandler >> handleGet: request [
     ^ renderer renderPage: 'login' context: Dictionary new
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'handling' }
 BlennyLoginHandler >> handlePost: request [
     | formData username password sessionId |
     
@@ -42,7 +65,7 @@ BlennyLoginHandler >> initializeWithAuth: anAuthProvider renderer: aRenderer [
     renderer := aRenderer.
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'private' }
 BlennyLoginHandler >> redirectWithCookie: sessionId [
 
     | response cookie |
@@ -63,7 +86,7 @@ BlennyLoginHandler >> redirectWithCookie: sessionId [
 
 ]
 
-{ #category : 'rendering' }
+{ #category : 'private' }
 BlennyLoginHandler >> renderError: errorMessage request: aRequest [
 
     | context formData |

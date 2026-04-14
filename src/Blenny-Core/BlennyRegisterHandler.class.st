@@ -1,3 +1,29 @@
+"
+I handle user registration requests (GET and POST).
+
+GET /register    - Display the registration form
+POST /register   - Create new user account
+
+My responsibilities:
+- Render the registration page (GET)
+- Validate form data (email, password, confirm password)
+- Check if user already exists
+- Create new user via authProvider
+- Optionally auto-login after registration (configurable)
+- Redirect to login page (or dashboard if auto-login)
+
+I am created by BlennyWebApp with:
+    registerHandler := BlennyRegisterHandler new
+        initializeWithAuth: authProvider
+        renderer: renderer.
+
+Configuration:
+    handler autoLoginAfterRegistration: true.   ""Auto-login after signup""
+
+Usage:
+    handler handleGet: request.   ""Show form""
+    handler handlePost: request.  ""Process registration""
+"
 Class {
 	#name : 'BlennyRegisterHandler',
 	#superclass : 'Object',
@@ -15,7 +41,7 @@ BlennyRegisterHandler >> autoLoginAfterRegistration: aBoolean [
     autoLoginAfterRegistration := aBoolean.
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'handling' }
 BlennyRegisterHandler >> handleGet: request [
     | context email |
     context := Dictionary new.
@@ -24,7 +50,7 @@ BlennyRegisterHandler >> handleGet: request [
     ^ renderer renderPage: 'register' context: context
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'handling' }
 BlennyRegisterHandler >> handlePost: request [
     | formData email password confirm |
     
@@ -59,7 +85,7 @@ BlennyRegisterHandler >> initializeWithAuth: anAuthProvider renderer: aRenderer 
     autoLoginAfterRegistration := false.
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'private' }
 BlennyRegisterHandler >> redirectToLogin [
     | response cookie |
     
@@ -75,7 +101,7 @@ BlennyRegisterHandler >> redirectToLogin [
     ^ response
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'private' }
 BlennyRegisterHandler >> redirectWithCookie: sessionId [
     | response cookie |
     
@@ -90,7 +116,7 @@ BlennyRegisterHandler >> redirectWithCookie: sessionId [
     ^ response
 ]
 
-{ #category : 'rendering' }
+{ #category : 'private' }
 BlennyRegisterHandler >> renderError: errorMessage request: aRequest [
     | context formData |
     context := Dictionary new.

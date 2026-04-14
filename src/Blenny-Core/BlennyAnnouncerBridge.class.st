@@ -1,3 +1,30 @@
+"
+I am the bridge between the Announcer pub/sub system and WebSocket clients.
+
+I manage WebSocket connections for a single endpoint (either '/ws/html' or '/ws/data').
+
+My responsibilities:
+- Track connected clients by userId and connection ID
+- Subscribe to announcement classes (HTMLBroadcast, HTMLDirect, DataBroadcast, DataDirect)
+- Broadcast messages to all connected clients
+- Send direct messages to specific users
+- Handle WebSocket lifecycle (connect, disconnect, read loop)
+
+I am created per endpoint by BlennyWebApp:
+    htmlBridge := BlennyAnnouncerBridge new initializeWithEndpoint: 'html'.
+    dataBridge := BlennyAnnouncerBridge new initializeWithEndpoint: 'data'.
+
+Usage:
+    ""Broadcast to all HTML clients""
+    htmlBridge broadcastHtml: '<div>Hello</div>'.
+    
+    ""Direct message to specific user""
+    htmlBridge directHtml: '<div>Private</div>' to: 'alice'.
+
+I use a dictionary-based client store:
+    clientsById: connection ID → client info
+    clientsByUserId: user ID → collection of client info
+"
 Class {
 	#name : 'BlennyAnnouncerBridge',
 	#superclass : 'Object',
@@ -12,7 +39,7 @@ Class {
 	#package : 'Blenny-Core'
 }
 
-{ #category : 'client management' }
+{ #category : 'private' }
 BlennyAnnouncerBridge >> addClient: aWebSocket forUser: aUserId [
     | userClients clientInfo |
     
@@ -34,7 +61,7 @@ BlennyAnnouncerBridge >> allClients [
     ^ clientsById values
 ]
 
-{ #category : 'handlers' }
+{ #category : 'publishing' }
 BlennyAnnouncerBridge >> broadcastData: aPayload [
     "Broadcast JSON to all data clients connected to this bridge"
     self allClients do: [ :clientInfo |
@@ -44,7 +71,7 @@ BlennyAnnouncerBridge >> broadcastData: aPayload [
                 Transcript show: 'Data broadcast failed: ', ex description; cr ] ]
 ]
 
-{ #category : 'handlers' }
+{ #category : 'publishing' }
 BlennyAnnouncerBridge >> broadcastHtml: aPayload [
     "Broadcast HTML to all HTML clients connected to this bridge"
     self allClients do: [ :clientInfo |
@@ -59,12 +86,7 @@ BlennyAnnouncerBridge >> clientConnectionsForUser: aUserId [
     ^ clientsByUserId at: aUserId ifAbsent: [ #() ]
 ]
 
-{ #category : 'as yet unclassified' }
-BlennyAnnouncerBridge >> connectedCount [
-    ^ clientsById size
-]
-
-{ #category : 'handlers' }
+{ #category : 'publishing' }
 BlennyAnnouncerBridge >> directData: aPayload to: aUserId [
     "Send JSON directly to a specific user"
     | clients |
@@ -76,7 +98,7 @@ BlennyAnnouncerBridge >> directData: aPayload to: aUserId [
                 Transcript show: 'Data direct failed: ', ex description; cr ] ]
 ]
 
-{ #category : 'handlers' }
+{ #category : 'publishing' }
 BlennyAnnouncerBridge >> directHtml: aPayload to: aUserId [
     "Send HTML directly to a specific user"
     | clients |
@@ -88,7 +110,7 @@ BlennyAnnouncerBridge >> directHtml: aPayload to: aUserId [
                 Transcript show: 'HTML direct failed: ', ex description; cr ] ]
 ]
 
-{ #category : 'handlers' }
+{ #category : 'handling' }
 BlennyAnnouncerBridge >> handleWebSocket: aWebSocket forUser: aUserId [
     | clientInfo |
     
@@ -160,7 +182,7 @@ BlennyAnnouncerBridge >> publish: anAnnouncement [
     announcer announce: anAnnouncement
 ]
 
-{ #category : 'client management' }
+{ #category : 'private' }
 BlennyAnnouncerBridge >> removeClient: aWebSocket forUser: aUserId [
     | clientInfo userClients |
     
@@ -175,7 +197,7 @@ BlennyAnnouncerBridge >> removeClient: aWebSocket forUser: aUserId [
     Transcript show: 'Bridge DISCONNECTED: ', aUserId, ' [', endpoint, '] (Remaining: ', clientsByUserId size asString, ')'; cr.
 ]
 
-{ #category : 'accessing' }
+{ #category : 'shutdown' }
 BlennyAnnouncerBridge >> stop [
     isRunning := false.
     

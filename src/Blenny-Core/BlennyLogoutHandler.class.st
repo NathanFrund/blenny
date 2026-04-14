@@ -1,3 +1,21 @@
+"
+I handle user logout requests (POST /logout).
+
+My responsibilities:
+- Extract JWT token from cookie
+- Add token to blacklist (prevents reuse)
+- Clear the session cookie (maxAge: 0)
+- Redirect to login page
+
+I am created by BlennyWebApp with:
+    logoutHandler := BlennyLogoutHandler new
+        initializeWithAuth: authProvider.
+
+Usage:
+    handler handlePost: request.  ""Process logout""
+
+Note: Supports both GET and POST for development, but POST is recommended for security.
+"
 Class {
 	#name : 'BlennyLogoutHandler',
 	#superclass : 'Object',
@@ -8,13 +26,13 @@ Class {
 	#package : 'Blenny-Core'
 }
 
-{ #category : 'as yet unclassified' }
+{ #category : 'handling' }
 BlennyLogoutHandler >> handleGet: request [
     "Support GET for browser testing"
     ^ self handlePost: request
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'handling' }
 BlennyLogoutHandler >> handlePost: request [
 
     | cookie sessionId |
@@ -37,7 +55,7 @@ BlennyLogoutHandler >> initializeWithAuth: anAuthProvider [
     authProvider := anAuthProvider
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'private' }
 BlennyLogoutHandler >> redirectToLogin [
     | response cookie |
     

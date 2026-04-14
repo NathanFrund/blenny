@@ -1,3 +1,35 @@
+"
+I am the main configuration facade for Blenny.
+
+I provide a unified interface to configuration values from multiple sources, with a clear precedence order:
+
+1. Command line arguments (--key=value)
+2. Environment variables (BLENNY_KEY=value)
+3. Config file (blenny.json)
+4. Embedded defaults (compiled into the image)
+
+I automatically select the appropriate provider based on what's available.
+
+Usage:
+    ""Get a value""
+    port := BlennyConfig current at: 'server.port'.
+    
+    ""Convenience methods for common keys""
+    port := BlennyConfig current port.
+    secret := BlennyConfig current jwtSecret.
+    
+    ""Reset the cache (useful after changing config file)""
+    BlennyConfig reset.
+
+Configuration keys use dot notation:
+    server.port
+    server.bind_address
+    auth.jwt_secret
+    auth.session_duration_hours
+    dev_mode
+
+I am the single source of truth for all Blenny configuration.
+"
 Class {
 	#name : 'BlennyConfig',
 	#superclass : 'Object',

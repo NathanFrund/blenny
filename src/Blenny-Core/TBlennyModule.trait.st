@@ -1,10 +1,31 @@
+"
+I am the trait for creating pluggable Blenny modules.
+
+To create a module:
+    Object subclass: #MyModule
+        uses: TBlennyModule
+
+Required method:
+    registerRoutesOn: aRouter   ""Register your HTTP routes""
+
+Optional methods:
+    initializeModule   ""Called when module is loaded""
+    startModule        ""Called when server starts""
+    stopModule         ""Called when server stops""
+
+Your module can also use these provided methods:
+    authenticatedUserFrom:   ""Get current user from request""
+    broadcastHtml:           ""Send to all connected clients""
+    directHtml:toUser:       ""Send to specific user""
+    renderPage:context:      ""Render a template""
+"
 Trait {
 	#name : 'TBlennyModule',
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
 }
 
-{ #category : 'as yet unclassified' }
+{ #category : 'authentication' }
 TBlennyModule >> authenticatedUserFrom: request [
     | token |
     token := request uri queryAt: 'token' ifAbsent: [ nil ].
@@ -34,7 +55,7 @@ TBlennyModule >> directHtml: aString toUser: aUserId [
     BlennyPublisher directHtml: aString toUser: aUserId
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'authentication' }
 TBlennyModule >> extractTokenFromCookie: request [
     | cookieHeader cookies |
     cookieHeader := request headers at: 'Cookie' ifAbsent: [ ^ nil ].
@@ -47,7 +68,7 @@ TBlennyModule >> extractTokenFromCookie: request [
     ^ cookies at: 'session' ifAbsent: [ nil ]
 ]
 
-{ #category : 'initialization' }
+{ #category : 'lifecycle' }
 TBlennyModule >> initializeModule [
     "Called when module is loaded"
     ^ self
@@ -55,11 +76,11 @@ TBlennyModule >> initializeModule [
 
 { #category : 'accessing' }
 TBlennyModule >> moduleName [
-    "Auto-generate name from class"
-    ^ self class name withoutSuffix: 'Module' asLowercase
+    "Returns 'blennyauth' if the class is BlennyAuthModule"
+    ^ (self class name asString withoutSuffix: 'Module') asLowercase
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'required' }
 TBlennyModule >> registerRoutesOn: aRouter [
     self subclassResponsibility
 ]
@@ -76,13 +97,13 @@ TBlennyModule >> renderPage: aTemplateName context: aDictionary [
         renderPage: aTemplateName context: aDictionary
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'lifecycle' }
 TBlennyModule >> startModule [
     "Called when server starts"
     ^ self
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'lifecycle' }
 TBlennyModule >> stopModule [
     "Called when server stops"
     ^ self

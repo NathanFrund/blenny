@@ -1,3 +1,21 @@
+"
+I am the main entry point for a Blenny application.
+
+I manage:
+- HTTP/WebSocket server lifecycle (start/stop)
+- Authentication provider
+- Template rendering (via Conduit)
+- Module discovery and loading
+- Configuration (via BlennyConfig)
+
+Example usage:
+    app := BlennyWebApp new.
+    app startOn: nil port: 8081.
+    BlennyPublisher broadcastHtml: '<div>Hello</div>'.
+
+To stop:
+    app stop.
+"
 Class {
 	#name : 'BlennyWebApp',
 	#superclass : 'Object',
@@ -31,7 +49,7 @@ BlennyWebApp class >> withAuth: anAuthProvider [
     ^ self new initializeWithAuth: anAuthProvider
 ]
 
-{ #category : 'announcements' }
+{ #category : 'server' }
 BlennyWebApp >> announceStarted [
     | mode |
     mode := rootPath ifNil: [ 'frozen' ] ifNotNil: [ 'disk' ].
@@ -107,13 +125,6 @@ BlennyWebApp >> initialize [
 	modules := OrderedCollection new.
 ]
 
-{ #category : 'initialization' }
-BlennyWebApp >> initializeWithAuth: anAuthProvider [
-    "Initialize with a specific auth provider"
-    port := 8081.
-    authProvider := anAuthProvider.
-]
-
 { #category : 'modules' }
 BlennyWebApp >> loadModule: aModuleClass [
     | module |
@@ -147,39 +158,9 @@ BlennyWebApp >> router [
 	^ router 
 ]
 
-{ #category : 'actions' }
-BlennyWebApp >> serveFrozenAsset: aPathString [
-    | fileRef methodName content |
-    fileRef := aPathString asFileReference.
-    methodName := ('frozenAsset', fileRef base capitalized, fileRef extension capitalized) asSymbol.
-    
-    content := nil.
-    (self respondsTo: methodName) ifTrue: [ 
-        content := self perform: methodName ].
-    
-    content ifNotNil: [
-        ^ ZnResponse ok: (ZnEntity 
-            with: content 
-            type: (ZnMimeType 
-                forFilenameExtension: fileRef extension 
-                ifAbsent: [ ZnMimeType applicationOctetStream ])) ].
-    
-    ^ ZnResponse notFound: aPathString
-]
-
 { #category : 'accessing' }
 BlennyWebApp >> server [
 	^ server
-]
-
-{ #category : 'private' }
-BlennyWebApp >> setModeFromPath: aPath [
-    aPath ifNil: [ 
-        rootPath := nil.
-        conduit := nil.
-        ^ self ].
-    rootPath := aPath asFileReference.
-    self setupDiskWatcher.
 ]
 
 { #category : 'private' }
@@ -196,12 +177,12 @@ BlennyWebApp >> startModules [
     modules do: [ :module | module startModule ]
 ]
 
-{ #category : 'public' }
+{ #category : 'server' }
 BlennyWebApp >> startOn: aPath [
     self startOn: aPath port: port.
 ]
 
-{ #category : 'public' }
+{ #category : 'server' }
 BlennyWebApp >> startOn: aPath port: aPortNumber [
     self stop.
     port := aPortNumber.
@@ -212,7 +193,7 @@ BlennyWebApp >> startOn: aPath port: aPortNumber [
     self announceStarted.
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'server' }
 BlennyWebApp >> startServer [
 
 	| bindAddress |
@@ -288,7 +269,7 @@ BlennyWebApp >> startServer [
 		cr
 ]
 
-{ #category : 'accessing' }
+{ #category : 'server' }
 BlennyWebApp >> stop [
 
 	"Stop modules first (so they can clean up)"

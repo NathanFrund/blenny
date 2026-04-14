@@ -1,3 +1,15 @@
+"
+I provide JWT-based authentication for Blenny.
+
+Features:
+- JWT creation and validation (HS256)
+- Configurable session duration
+- Token blacklist with automatic cleanup
+- User management (create, delete, exists)
+- Password hashing (simple hash for development)
+
+This is a reference implementation. For production, replace with your own auth provider.
+"
 Class {
 	#name : 'BlennySimpleAuth',
 	#superclass : 'Object',
@@ -124,13 +136,13 @@ BlennySimpleAuth >> setupTestUsers [
     users at: 'charlie' put: (self hashPassword: 'secret').
 ]
 
-{ #category : 'system startup' }
+{ #category : 'system' }
 BlennySimpleAuth >> shutDown [
     "Pharo system hook - called on image shutdown"
     self shutdown.
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'shutdown' }
 BlennySimpleAuth >> shutdown [
     "Clean up background processes"
     self stopBlacklistJanitor.

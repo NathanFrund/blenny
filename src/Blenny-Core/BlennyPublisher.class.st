@@ -1,3 +1,21 @@
+"
+I allow any Pharo object to publish WebSocket messages without knowing about Blenny.
+
+Any code in your image can send real-time updates:
+    BlennyPublisher broadcastHtml: '<div>Hello</div>'
+    BlennyPublisher broadcastData: '{""type"": ""update""}'
+    BlennyPublisher directHtml: 'Private message' toUser: 'alice'
+
+I automatically find the running BlennyWebApp instance and delegate to it.
+
+My methods are all class-side, so you never need to create an instance:
+    BlennyPublisher broadcastHtml: '...'
+
+For testing, you can reset the cached web app reference:
+    BlennyPublisher reset.
+
+I am the simplest way to push real-time updates from any part of your Pharo image.
+"
 Class {
 	#name : 'BlennyPublisher',
 	#superclass : 'Object',
@@ -39,7 +57,7 @@ BlennyPublisher class >> directHtml: aString toUser: aUserId [
     ^ self currentWebApp directHtml: aString toUser: aUserId
 ]
 
-{ #category : 'publishing' }
+{ #category : 'public' }
 BlennyPublisher class >> reset [
     "Reset cached web app (useful for testing)"
     CurrentWebApp := nil
