@@ -27,24 +27,23 @@ Class {
 		'loginHandler',
 		'logoutHandler',
 		'registerHandler',
-		'routes'
+		'routes',
+		'globalMiddleware'
 	],
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
 }
 
-{ #category : 'authentication' }
-BlennyRouter >> cookieAt: aKey from: request [
-    "Extract cookie value from request"
-    | cookieHeader cookies |
-    cookieHeader := request headers at: 'Cookie' ifAbsent: [ ^ nil ].
-    cookies := Dictionary new.
-    (cookieHeader splitOn: '; ') do: [ :pair |
-        | key value |
-        key := (pair copyUpTo: $=).
-        value := (pair copyAfter: $=).
-        cookies at: key put: value ].
-    ^ cookies at: aKey ifAbsent: [ nil ]
+{ #category : 'middleware' }
+BlennyRouter >> applyGlobalMiddlewareTo: aBlock [
+    | wrapped |
+    wrapped := aBlock.
+    globalMiddleware reverseDo: [ :mw | 
+        | previousHandler |
+        "This temporary variable captures the state for THIS specific closure"
+        previousHandler := wrapped. 
+        wrapped := [ :req | mw value: previousHandler value: req ] ].
+    ^ wrapped
 ]
 
 { #category : 'accessing' }
@@ -70,8 +69,9 @@ BlennyRouter >> ensureResponse: anObject [
 BlennyRouter >> extractTokenFrom: request [
     "Extract JWT token from URL or cookie"
     | token |
+	Transcript show: 'Router extractTokenFrom called'; cr.
     token := request uri queryAt: 'token' ifAbsent: [ nil ].
-    token ifNil: [ token := self cookieAt: 'session' from: request ].
+    token ifNil: [ token := BlennyMiddleware extractTokenFromCookie: request ].
     ^ token
 ]
 
@@ -183,26 +183,29 @@ BlennyRouter >> initializeWith: aDictionary [
 	htmlBridge := aDictionary at: 'htmlBridge'.
 	dataBridge := aDictionary at: 'dataBridge'.
 	rootPath := aDictionary at: 'rootPath' ifAbsent: [ nil ].
-	routes := OrderedCollection new
+	routes := OrderedCollection new.
+	globalMiddleware := OrderedCollection new.
 ]
 
 { #category : 'module-registration' }
 BlennyRouter >> registerGet: aPath handler: aBlock [
-    "Register a GET route"
+    | wrappedHandler |
+    wrappedHandler := self applyGlobalMiddlewareTo: aBlock.
     routes add: { 
         'method' -> #GET. 
         'path' -> aPath. 
-        'handler' -> aBlock 
+        'handler' -> wrappedHandler 
     } asDictionary.
 ]
 
 { #category : 'module-registration' }
 BlennyRouter >> registerPost: aPath handler: aBlock [
-    "Register a POST route"
+    | wrappedHandler |
+    wrappedHandler := self applyGlobalMiddlewareTo: aBlock.
     routes add: { 
         'method' -> #POST. 
         'path' -> aPath. 
-        'handler' -> aBlock 
+        'handler' -> wrappedHandler 
     } asDictionary.
 ]
 
@@ -215,4 +218,10 @@ rootPath := aRootPath
 { #category : 'accessing' }
 BlennyRouter >> routes [ 
 	^ routes.
+]
+
+{ #category : 'middleware' }
+BlennyRouter >> use: aMiddleware [
+    "Add global middleware"
+    globalMiddleware add: aMiddleware.
 ]

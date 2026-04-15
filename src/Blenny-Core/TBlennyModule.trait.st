@@ -27,12 +27,15 @@ Trait {
 
 { #category : 'authentication' }
 TBlennyModule >> authenticatedUserFrom: request [
-    | token |
+    | token user |
     token := request uri queryAt: 'token' ifAbsent: [ nil ].
-    token ifNil: [
-        token := self extractTokenFromCookie: request ].
+    token ifNil: [ token := BlennyMiddleware extractTokenFromCookie: request ].
     token ifNil: [ ^ nil ].
-    ^ BlennyPublisher currentWebApp authProvider validateToken: token
+    
+    user := BlennyPublisher currentWebApp authProvider validateToken: token.
+    
+    "FORCE CHECK: Ensure we aren't returning a SmallInteger error code"
+    ^ (user isString) ifTrue: [ user ] ifFalse: [ nil ]
 ]
 
 { #category : 'publishing' }
@@ -53,19 +56,6 @@ TBlennyModule >> directData: aString toUser: aUserId [
 { #category : 'publishing' }
 TBlennyModule >> directHtml: aString toUser: aUserId [
     BlennyPublisher directHtml: aString toUser: aUserId
-]
-
-{ #category : 'authentication' }
-TBlennyModule >> extractTokenFromCookie: request [
-    | cookieHeader cookies |
-    cookieHeader := request headers at: 'Cookie' ifAbsent: [ ^ nil ].
-    cookies := Dictionary new.
-    (cookieHeader splitOn: '; ') do: [ :pair |
-        | key value |
-        key := (pair copyUpTo: $=).
-        value := (pair copyAfter: $=).
-        cookies at: key put: value ].
-    ^ cookies at: 'session' ifAbsent: [ nil ]
 ]
 
 { #category : 'lifecycle' }
@@ -92,9 +82,31 @@ TBlennyModule >> render: aTemplateName request: aRequest context: aDictionary [
 ]
 
 { #category : 'rendering' }
-TBlennyModule >> renderPage: aTemplateName context: aDictionary [
-    ^ BlennyPublisher currentWebApp renderer 
-        renderPage: aTemplateName context: aDictionary
+TBlennyModule >> renderPage: templateName context: aDictionary [
+    "Default entry point for simple renders"
+    ^ self renderPage: templateName context: aDictionary request: nil
+]
+
+{ #category : 'rendering' }
+TBlennyModule >> renderPage: templateName context: aDictionary request: aRequest [
+    | renderer html |
+    renderer := BlennyPublisher currentWebApp renderer.
+    
+    "1. Intelligent Branching: Full Page vs. HTMX Fragment"
+    html := (aRequest notNil and: [ renderer isHtmxRequest: aRequest ])
+        ifTrue: [ renderer renderFragment: templateName context: aDictionary ]
+        ifFalse: [ renderer renderPage: templateName context: aDictionary ].
+    
+    "2. Anti-Fragility: If the renderer already returned a Response, pass it through"
+    (html isKindOf: ZnResponse) ifTrue: [ ^ html ].
+    
+    "3. Type Safety: Ensure we have a string before wrapping"
+    (html isString) ifFalse: [ 
+        Transcript show: 'CRITICAL: Render failed for ', templateName, '. Result was: ', html class name; cr.
+        ^ ZnResponse serverError: 'Template Rendering Failed' ].
+
+    "4. Final Wrap: Fulfill the middleware contract"
+    ^ ZnResponse ok: (ZnEntity html: html)
 ]
 
 { #category : 'lifecycle' }

@@ -163,6 +163,21 @@ BlennyWebApp >> server [
 	^ server
 ]
 
+{ #category : 'middle' }
+BlennyWebApp >> setupDefaultMiddleware [
+    "router use: (BlennyMiddleware recover)."
+    router use: (BlennyMiddleware logRequests).
+    router use: (BlennyMiddleware addSecurityHeaders).
+]
+
+{ #category : 'middleware' }
+BlennyWebApp >> setupDefaultMiddlewareOn: aRouter [
+    "Apply default middleware to the router"
+    aRouter use: (BlennyMiddleware recoverSilent).
+    aRouter use: (BlennyMiddleware logRequests).
+    aRouter use: (BlennyMiddleware addSecurityHeaders).
+]
+
 { #category : 'private' }
 BlennyWebApp >> setupDiskWatcher [
     | templatesPath |
@@ -237,6 +252,9 @@ BlennyWebApp >> startServer [
 			          ('htmlBridge' -> htmlBridge).
 			          ('dataBridge' -> dataBridge).
 			          ('rootPath' -> rootPath) } asDictionary.
+			
+	"Setup middleware on router"
+    self setupDefaultMiddlewareOn: router.
 
 	"===== REGISTER MODULES WITH ROUTER ====="
 	self registerModulesWithRouter: router.

@@ -42,8 +42,10 @@ DashboardModule >> handleDashboard: request [
     | user |
     user := self authenticatedUserFrom: request.
     user ifNil: [ ^ ZnResponse redirect: '/login' ].
-    
-    ^ self renderPage: 'dashboard' context: { 'username' -> user } asDictionary
+
+    ^ self renderPage: 'dashboard' 
+           context: { 'username' -> user } asDictionary 
+           request: request
 ]
 
 { #category : 'as yet unclassified' }

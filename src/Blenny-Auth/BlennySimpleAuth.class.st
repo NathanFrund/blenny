@@ -180,23 +180,35 @@ BlennySimpleAuth >> userExists: aUsername [
 
 { #category : 'jwt' }
 BlennySimpleAuth >> validateJwt: aToken [
-    | jws jti expValue |
+    | jws jti expValue result |
     aToken ifNil: [ ^ nil ].
     
     [ 
         jws := JsonWebSignature materializeCompact: aToken key: self jwtSecret.
         
         expValue := jws payload exp.
-        expValue <= DateAndTime now asUnixTime ifTrue: [ ^ nil ].
+        expValue <= DateAndTime now asUnixTime ifTrue: [ 
+            Transcript show: 'Token expired'; cr.
+            ^ nil ].
         
         jti := jws payload jti.
-        (blacklist includesKey: jti) ifTrue: [ ^ nil ].
+        (blacklist includesKey: jti) ifTrue: [ 
+            Transcript show: 'Token blacklisted'; cr.
+            ^ nil ].
         
-        ^ jws payload sub
-    ] on: Error do: [ :ex | ^ nil ]
+        result := jws payload sub.
+        Transcript show: 'Returning user ID: ', result; cr.
+        ^ result
+    ] on: Error do: [ :ex | 
+        Transcript show: 'JWT Error: ', ex description; cr.
+        ^ nil ]
 ]
 
 { #category : 'authentication' }
 BlennySimpleAuth >> validateToken: token [
-    ^ self validateJwt: token
+    | result |
+    Transcript show: 'validateToken called, delegating to validateJwt'; cr.
+    result := self validateJwt: token.
+    Transcript show: 'validateJwt returned: ', (result ifNil: ['nil']); cr.
+    ^ result
 ]
