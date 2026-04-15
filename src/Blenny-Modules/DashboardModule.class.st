@@ -37,7 +37,7 @@ Class {
 	#package : 'Blenny-Modules'
 }
 
-{ #category : 'as yet unclassified' }
+{ #category : 'handling' }
 DashboardModule >> handleDashboard: request [
     | user |
     user := self authenticatedUserFrom: request.
@@ -48,7 +48,7 @@ DashboardModule >> handleDashboard: request [
            request: request
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'handling' }
 DashboardModule >> handleNotify: request [
     | user message formData |
     user := self authenticatedUserFrom: request.
