@@ -58,7 +58,7 @@ Blenny is designed so that **business logic doesn't need to know about the trans
 ```smalltalk
 Metacello new
     baseline: 'Blenny';
-    repository: 'github://yourusername/Blenny';
+    repository: 'github://NathanFrund/Blenny';
     load.
 ```
 
@@ -129,14 +129,9 @@ Create `blenny.json` in your working directory:
   - JSONWebToken (for JWT support)
   - Conduit (for template rendering)
 
-## License
-
-MIT
-
 ## Why Pharo?
 
 Pharo offers live object-oriented programming, hot code reloading, and a pure object environment. Blenny brings these strengths to web development, allowing you to build and debug real-time applications.
-```
 
 ## License
 
