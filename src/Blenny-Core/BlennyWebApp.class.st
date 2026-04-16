@@ -38,17 +38,6 @@ Class {
 	#package : 'Blenny-Core'
 }
 
-{ #category : 'accessing' }
-BlennyWebApp class >> default [
-    "Convenience for quick start - uses SimpleAuth for development"
-    ^ self new initializeWithAuth: BlennySimpleAuth new.
-]
-
-{ #category : 'as yet unclassified' }
-BlennyWebApp class >> withAuth: anAuthProvider [
-    ^ self new initializeWithAuth: anAuthProvider
-]
-
 { #category : 'server' }
 BlennyWebApp >> announceStarted [
     | mode |
@@ -78,6 +67,26 @@ BlennyWebApp >> broadcastHtml: aString [
 { #category : 'accessing' }
 BlennyWebApp >> conduit [
 	^ conduit
+]
+
+{ #category : 'initialization' }
+BlennyWebApp >> createAuthProvider [
+    | persistenceType repository auth |
+    persistenceType := BlennyConfig current at: 'persistence.type' ifAbsent: [ 'memory' ].
+    
+    Transcript show: 'Persistence type: ', persistenceType; cr.
+    
+    repository := BlennyMemoryRepository new.
+    Transcript show: 'Repository created: ', repository asString; cr.
+    
+    auth := BlennySimpleAuth new.
+    Transcript show: 'Auth created: ', auth asString; cr.
+    
+    auth repository: repository.
+    Transcript show: 'Repository set in auth'; cr.
+    Transcript show: 'Auth repository now: ', auth repository asString; cr.
+    
+    ^ auth
 ]
 
 { #category : 'accessing' }
@@ -121,7 +130,7 @@ BlennyWebApp >> initialize [
 
 	super initialize.
 	port := BlennyConfig current at: 'port' ifAbsent: [ 8081 ].
-	authProvider := BlennySimpleAuth new.
+	authProvider := self createAuthProvider.
 	modules := OrderedCollection new.
 ]
 
@@ -129,6 +138,13 @@ BlennyWebApp >> initialize [
 BlennyWebApp >> loadModule: aModuleClass [
     | module |
     module := aModuleClass new.
+    
+    "Always inject authProvider and renderer"
+    (module respondsTo: #authProvider:) ifTrue: [
+        module authProvider: authProvider ].
+    (module respondsTo: #renderer:) ifTrue: [
+        module renderer: renderer ].
+    
     module initializeModule.
     modules add: module.
     Transcript show: 'Loaded module: ', module moduleName; cr.

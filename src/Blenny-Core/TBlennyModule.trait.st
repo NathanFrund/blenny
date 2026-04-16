@@ -27,15 +27,15 @@ Trait {
 
 { #category : 'authentication' }
 TBlennyModule >> authenticatedUserFrom: request [
-    | token user |
+    | token userId |
     token := request uri queryAt: 'token' ifAbsent: [ nil ].
     token ifNil: [ token := BlennyMiddleware extractTokenFromCookie: request ].
     token ifNil: [ ^ nil ].
     
-    user := BlennyPublisher currentWebApp authProvider validateToken: token.
-    
-    "FORCE CHECK: Ensure we aren't returning a SmallInteger error code"
-    ^ (user isString) ifTrue: [ user ] ifFalse: [ nil ]
+    "Assume authProvider is injected"
+    userId := self authProvider validateToken: token.
+    ^ userId
+
 ]
 
 { #category : 'publishing' }

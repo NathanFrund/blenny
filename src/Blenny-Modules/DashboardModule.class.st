@@ -33,14 +33,31 @@ Class {
 	#superclass : 'Object',
 	#traits : 'TBlennyModule',
 	#classTraits : 'TBlennyModule classTrait',
+	#instVars : [
+		'authProvider',
+		'renderer'
+	],
 	#category : 'Blenny-Modules',
 	#package : 'Blenny-Modules'
 }
+
+{ #category : 'accessing' }
+DashboardModule >> authProvider [ 
+	^ authProvider 
+]
+
+{ #category : 'accessing' }
+DashboardModule >> authProvider: anObject [
+    authProvider := anObject
+]
 
 { #category : 'handling' }
 DashboardModule >> handleDashboard: request [
     | user |
     user := self authenticatedUserFrom: request.
+
+	Transcript show: 'Dashboard user: '; show: user; cr.
+
     user ifNil: [ ^ ZnResponse redirect: '/login' ].
 
     ^ self renderPage: 'dashboard' 
@@ -70,4 +87,9 @@ DashboardModule >> registerRoutesOn: aRouter [
         self handleDashboard: request ].
     aRouter registerPost: '/dashboard/notify' handler: [ :request |
         self handleNotify: request ].
+]
+
+{ #category : 'accessing' }
+DashboardModule >> renderer: anObject [
+    renderer := anObject
 ]

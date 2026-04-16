@@ -22,11 +22,14 @@ BaselineOfBlenny >> baseline: spec [
         
         "Config is the foundation"
         spec package: 'Blenny-Config'.
+        
+        "Persistence provides storage contracts"
+        spec package: 'Blenny-Persistence'.
 
         "Core contains the App, Router, Bridges, and Handlers. 
-         It requires Config and the external web/asset tools."
+         It requires Config, Persistence, and the external web/asset tools."
         spec package: 'Blenny-Core' with: [ 
-            spec requires: #('Blenny-Config' 'ZincHTTPComponents' 'Conduit').
+            spec requires: #('Blenny-Config' 'Blenny-Persistence' 'ZincHTTPComponents' 'Conduit').
             spec includes: #('ZincHTTPComponents' -> #('WebSocket')) ].
 
         "Announcements provides the specialized messaging types 
@@ -35,14 +38,23 @@ BaselineOfBlenny >> baseline: spec [
             spec requires: #('Blenny-Core') ].
 
         "Auth contains the login/logout logic and providers.
-         It depends on Core (for handlers) and JWT for tokens."
+         It depends on Core, Persistence, and JWT for tokens."
         spec package: 'Blenny-Auth' with: [ 
-            spec requires: #('Blenny-Core' 'JSONWebToken') ].
+            spec requires: #('Blenny-Core' 'Blenny-Persistence' 'JSONWebToken') ].
+
+        "Middleware provides composable request filters"
+        spec package: 'Blenny-Middleware' with: [
+            spec requires: #('Blenny-Core') ].
+
+        "Modules provides pluggable application components"
+        spec package: 'Blenny-Modules' with: [
+            spec requires: #('Blenny-Core' 'Blenny-Auth') ].
 
         "3. Groups"
         spec 
             group: 'default' with: #('Full');
-            group: 'Core' with: #('Blenny-Core' 'Blenny-Config');
-            group: 'Full' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Auth' 'Blenny-Announcements').
+            group: 'Core' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence');
+            group: 'Auth' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence' 'Blenny-Auth');
+            group: 'Full' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence' 'Blenny-Auth' 'Blenny-Announcements' 'Blenny-Middleware' 'Blenny-Modules').
     ]
 ]

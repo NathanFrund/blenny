@@ -14,8 +14,7 @@ Class {
 	#name : 'BlennySimpleAuth',
 	#superclass : 'Object',
 	#instVars : [
-		'users',
-		'blacklist',
+		'repository',
 		'janitorProcess'
 	],
 	#category : 'Blenny-Auth',
@@ -24,26 +23,18 @@ Class {
 
 { #category : 'authentication' }
 BlennySimpleAuth >> authenticate: username password: password [
-    | storedHash |
-    storedHash := users at: username ifAbsent: [ ^ nil ].
+    | user storedHash |
+    user := repository findUserByUsername: username.
+    user ifNil: [ ^ nil ].
+    storedHash := user at: 'passwordHash'.
     (self hashPassword: password) = storedHash ifTrue: [
         ^ self createJwtForUser: username ].
     ^ nil
 ]
 
-{ #category : 'accessing' }
-BlennySimpleAuth >> blacklist [
-	^ blacklist 
-]
-
 { #category : 'blacklist' }
 BlennySimpleAuth >> cleanupBlacklist [
-    "Remove expired entries from blacklist"
-    | now |
-    now := DateAndTime now.
-    blacklist keys copy do: [ :jti |
-        (blacklist at: jti) <= now ifTrue: [ 
-            blacklist removeKey: jti ] ].
+    repository cleanupExpiredBlacklist.
 ]
 
 { #category : 'jwt' }
@@ -66,16 +57,30 @@ BlennySimpleAuth >> createJwtForUser: aUserId [
     ^ jws compactSerialized
 ]
 
+{ #category : 'password-reset' }
+BlennySimpleAuth >> createPasswordResetTokenFor: email [
+    | token expiration |
+    token := UUID new asString.
+    expiration := DateAndTime now + (1 * 60 * 60).
+    repository saveResetToken: token forEmail: email expiration: expiration.
+    ^ token
+]
+
 { #category : 'user management' }
 BlennySimpleAuth >> createUser: aUsername password: aPassword [
-    (users includesKey: aUsername) ifTrue: [ ^ false ].
-    users at: aUsername put: (self hashPassword: aPassword).
+    (self userExists: aUsername) ifTrue: [ ^ false ].
+    repository saveUser: {
+        'id' -> UUID new asString.
+        'username' -> aUsername.
+        'passwordHash' -> (self hashPassword: aPassword).
+        'createdAt' -> DateAndTime now.
+    } asDictionary.
     ^ true
 ]
 
 { #category : 'user management' }
 BlennySimpleAuth >> deleteUser: aUsername [
-    users removeKey: aUsername ifAbsent: [].
+    repository deleteUser: aUsername.
 ]
 
 { #category : 'jwt' }
@@ -106,11 +111,8 @@ BlennySimpleAuth >> hashPassword: aPassword [
 { #category : 'initialization' }
 BlennySimpleAuth >> initialize [
     super initialize.
-    users := Dictionary new.
-    blacklist := Dictionary new.
-    self setupTestUsers.
-    self cleanupBlacklist.  "Clean on startup"
-    self startBlacklistJanitor.
+
+
 ]
 
 { #category : 'jwt' }
@@ -121,7 +123,6 @@ BlennySimpleAuth >> jwtSecret [
 
 { #category : 'authentication' }
 BlennySimpleAuth >> logout: aToken [
-    "Add token to blacklist"
     | jti exp |
     aToken ifNil: [ ^ self ].
     
@@ -129,16 +130,32 @@ BlennySimpleAuth >> logout: aToken [
     exp := self extractExpFromToken: aToken.
     
     jti ifNotNil: [ 
-        blacklist at: jti put: exp.
+        repository saveBlacklistEntry: jti expiration: exp.
         Transcript show: 'Token blacklisted until: ', exp asString; cr ].
 ]
 
-{ #category : 'initialization' }
-BlennySimpleAuth >> setupTestUsers [
-    "username -> hashedPassword"
-    users at: 'alice' put: (self hashPassword: 'secret').
-    users at: 'bob' put: (self hashPassword: 'secret').
-    users at: 'charlie' put: (self hashPassword: 'secret').
+{ #category : 'accessing' }
+BlennySimpleAuth >> repository [
+	^ repository 
+]
+
+{ #category : 'accessing' }
+BlennySimpleAuth >> repository: aRepository [
+
+	repository := aRepository.
+	"Now that repository is set, start the janitor"
+	self cleanupBlacklist.
+	self startBlacklistJanitor
+]
+
+{ #category : 'password-reset' }
+BlennySimpleAuth >> resetPassword: token newPassword: aPassword [
+    | email |
+    email := self validatePasswordResetToken: token.
+    email ifNil: [ ^ false ].
+    self createUser: email password: aPassword.
+    repository deleteResetToken: token.
+    ^ true
 ]
 
 { #category : 'system' }
@@ -155,12 +172,11 @@ BlennySimpleAuth >> shutdown [
 
 { #category : 'blacklist' }
 BlennySimpleAuth >> startBlacklistJanitor [
-    "Start background process to clean expired blacklist entries"
     janitorProcess := [
         [ true ] whileTrue: [
             (Delay forMinutes: 5) wait.
-            self cleanupBlacklist.
-            Transcript show: 'Blacklist cleanup complete. Size: ', blacklist size asString; cr.
+            self cleanupBlacklist.  "← This is correct"
+            Transcript show: 'Blacklist cleanup complete.'; cr.
         ]
     ] forkAt: Processor userBackgroundPriority named: 'BlennyAuthJanitor'.
 ]
@@ -174,14 +190,18 @@ BlennySimpleAuth >> stopBlacklistJanitor [
 
 { #category : 'user management' }
 BlennySimpleAuth >> userExists: aUsername [
-    ^ users includesKey: aUsername
-
+    ^ (repository findUserByUsername: aUsername) notNil
 ]
 
 { #category : 'jwt' }
 BlennySimpleAuth >> validateJwt: aToken [
     | jws jti expValue result |
     aToken ifNil: [ ^ nil ].
+    
+    "Guard against nil repository"
+    repository ifNil: [ 
+        Transcript show: 'ERROR: repository is nil in validateJwt!'; cr.
+        ^ nil ].
     
     [ 
         jws := JsonWebSignature materializeCompact: aToken key: self jwtSecret.
@@ -192,16 +212,20 @@ BlennySimpleAuth >> validateJwt: aToken [
             ^ nil ].
         
         jti := jws payload jti.
-        (blacklist includesKey: jti) ifTrue: [ 
+        (repository isBlacklisted: jti) ifTrue: [ 
             Transcript show: 'Token blacklisted'; cr.
             ^ nil ].
         
         result := jws payload sub.
-        Transcript show: 'Returning user ID: ', result; cr.
         ^ result
     ] on: Error do: [ :ex | 
         Transcript show: 'JWT Error: ', ex description; cr.
         ^ nil ]
+]
+
+{ #category : 'password-reset' }
+BlennySimpleAuth >> validatePasswordResetToken: token [
+    ^ repository findEmailByResetToken: token
 ]
 
 { #category : 'authentication' }
