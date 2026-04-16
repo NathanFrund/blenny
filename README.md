@@ -1,7 +1,7 @@
 # Blenny
 
 <p align="center">
-  <img src="BlennyMascot.svg" alt="Blenny Mascot" width="300">
+  <img src="BlennyMascot.svg" alt="Blenny Mascot" width="250">
 </p>
 
 **Bringing the legendary live-coding productivity of Pharo to the modern, real-time web.**
