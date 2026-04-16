@@ -200,7 +200,6 @@ BlennySimpleAuth >> validateJwt: aToken [
     
     "Guard against nil repository"
     repository ifNil: [ 
-        Transcript show: 'ERROR: repository is nil in validateJwt!'; cr.
         ^ nil ].
     
     [ 
@@ -208,12 +207,10 @@ BlennySimpleAuth >> validateJwt: aToken [
         
         expValue := jws payload exp.
         expValue <= DateAndTime now asUnixTime ifTrue: [ 
-            Transcript show: 'Token expired'; cr.
             ^ nil ].
         
         jti := jws payload jti.
         (repository isBlacklisted: jti) ifTrue: [ 
-            Transcript show: 'Token blacklisted'; cr.
             ^ nil ].
         
         result := jws payload sub.
@@ -231,8 +228,6 @@ BlennySimpleAuth >> validatePasswordResetToken: token [
 { #category : 'authentication' }
 BlennySimpleAuth >> validateToken: token [
     | result |
-    Transcript show: 'validateToken called, delegating to validateJwt'; cr.
     result := self validateJwt: token.
-    Transcript show: 'validateJwt returned: ', (result ifNil: ['nil']); cr.
     ^ result
 ]

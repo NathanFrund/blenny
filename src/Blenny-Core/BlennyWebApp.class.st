@@ -71,22 +71,23 @@ BlennyWebApp >> conduit [
 
 { #category : 'initialization' }
 BlennyWebApp >> createAuthProvider [
-    | persistenceType repository auth |
-    persistenceType := BlennyConfig current at: 'persistence.type' ifAbsent: [ 'memory' ].
-    
-    Transcript show: 'Persistence type: ', persistenceType; cr.
-    
-    repository := BlennyMemoryRepository new.
-    Transcript show: 'Repository created: ', repository asString; cr.
-    
-    auth := BlennySimpleAuth new.
-    Transcript show: 'Auth created: ', auth asString; cr.
-    
-    auth repository: repository.
-    Transcript show: 'Repository set in auth'; cr.
-    Transcript show: 'Auth repository now: ', auth repository asString; cr.
-    
-    ^ auth
+
+	| persistenceType repository auth |
+	persistenceType := BlennyConfig current
+		                   at: 'persistence.type'
+		                   ifAbsent: [ 'memory' ].
+
+
+	repository := BlennyMemoryRepository new.
+
+
+	auth := BlennySimpleAuth new.
+
+
+	auth repository: repository.
+
+
+	^ auth
 ]
 
 { #category : 'accessing' }
