@@ -25,6 +25,12 @@ Trait {
 	#package : 'Blenny-Core'
 }
 
+{ #category : 'accessing' }
+TBlennyModule >> authProvider [
+    "Subclasses must provide this"
+    self subclassResponsibility
+]
+
 { #category : 'authentication' }
 TBlennyModule >> authenticatedUserFrom: request [
     | token userId |
