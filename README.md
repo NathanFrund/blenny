@@ -1,5 +1,9 @@
 # Blenny
 
+<p align="center">
+  <img src="BlennyMascot.svg" alt="Blenny Mascot" width="300">
+</p>
+
 **Bringing the legendary live-coding productivity of Pharo to the modern, real-time web.**
 
 Blenny is a real-time web framework for Pharo that combines WebSockets, HTMX, JWT authentication, and a modular architecture. Build reactive applications with minimal effort and maximum reliability.
@@ -132,6 +136,10 @@ Create `blenny.json` in your working directory:
 ## Why Pharo?
 
 Pharo offers live object-oriented programming, hot code reloading, and a pure object environment. Blenny brings these strengths to web development, allowing you to build and debug real-time applications.
+
+## Why the name Blenny?
+
+Inspired by [Goby](https://github.com/NathanFrund/Goby) (my Go web framework), Blenny is its smaller, friendlier cousin. It is named after the tailspot blenny, a small, curious fish that is always watching the reef.
 
 ## License
 
