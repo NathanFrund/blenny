@@ -16,7 +16,9 @@ BaselineOfBlenny >> baseline: spec [
             baseline: 'JSONWebToken' 
             with: [ spec repository: 'github://ba-st-dependencies/JSONWebToken:v3' ];
             baseline: 'Conduit' 
-            with: [ spec repository: 'github://NathanFrund/Conduit:main/src' ].
+            with: [ spec repository: 'github://NathanFrund/Conduit:main/src' ];
+				baseline: 'Soil' 
+            with: [ spec repository: 'github://ApptiveGrid/Soil:v4/src' ].
 
         "2. Internal Package Topology"
         
@@ -55,6 +57,7 @@ BaselineOfBlenny >> baseline: spec [
             group: 'default' with: #('Full');
             group: 'Core' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence');
             group: 'Auth' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence' 'Blenny-Auth');
-            group: 'Full' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence' 'Blenny-Auth' 'Blenny-Announcements' 'Blenny-Middleware' 'Blenny-Modules').
+            group: 'Full' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence' 'Blenny-Auth' 'Blenny-Announcements' 'Blenny-Middleware' 'Blenny-Modules');
+				group: 'WithSoil' with: #('Full' 'Blenny-Persistence-Soil').
     ]
 ]
