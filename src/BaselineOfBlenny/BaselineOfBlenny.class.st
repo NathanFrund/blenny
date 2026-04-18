@@ -9,43 +9,38 @@ Class {
 BaselineOfBlenny >> baseline: spec [
     <baseline>
     spec for: #common do: [
-        "1. External Dependencies"
+        "External Dependencies"
         spec 
             baseline: 'ZincHTTPComponents' 
-            with: [ spec repository: 'github://svenvc/zinc/repository' ];
+            with: [ spec repository: 'github://svenvc/zinc/repository' ].
+        spec 
             baseline: 'JSONWebToken' 
-            with: [ spec repository: 'github://ba-st-dependencies/JSONWebToken:v3' ];
+            with: [ spec repository: 'github://ba-st-dependencies/JSONWebToken:v3' ].
+        spec 
             baseline: 'Conduit' 
-            with: [ spec repository: 'github://NathanFrund/Conduit:main/src' ];
+            with: [ spec repository: 'github://NathanFrund/Conduit:main/src' ].
+        spec 
             baseline: 'Soil' 
             with: [ spec repository: 'github://ApptiveGrid/Soil:v4/src' ].
 
-        "2. Internal Package Topology"
-        
+        "Internal Packages"
         spec package: 'Blenny-Config'.
         spec package: 'Blenny-Persistence'.
+        spec package: 'Blenny-Core'.
+        spec package: 'Blenny-Announcements'.
+        spec package: 'Blenny-Auth'.
+        spec package: 'Blenny-Middleware'.
+        spec package: 'Blenny-Modules'.
 
-        spec package: 'Blenny-Core' with: [ 
-            spec requires: #('Blenny-Config' 'Blenny-Persistence' 'ZincHTTPComponents' 'Conduit') ].
+        "Dependencies"
+        spec package: 'Blenny-Core' with: [ spec requires: #('Blenny-Config' 'Blenny-Persistence') ].
+        spec package: 'Blenny-Announcements' with: [ spec requires: #('Blenny-Core') ].
+        spec package: 'Blenny-Auth' with: [ spec requires: #('Blenny-Core' 'Blenny-Persistence') ].
+        spec package: 'Blenny-Middleware' with: [ spec requires: #('Blenny-Core') ].
+        spec package: 'Blenny-Modules' with: [ spec requires: #('Blenny-Core') ].
 
-        spec package: 'Blenny-Announcements' with: [ 
-            spec requires: #('Blenny-Core') ].
-
-        spec package: 'Blenny-Auth' with: [ 
-            spec requires: #('Blenny-Core' 'Blenny-Persistence' 'JSONWebToken') ].
-
-        spec package: 'Blenny-Middleware' with: [
-            spec requires: #('Blenny-Core') ].
-
-        spec package: 'Blenny-Modules' with: [
-            spec requires: #('Blenny-Core' 'Blenny-Auth') ].
-
-        "3. Groups"
-        spec 
-            group: 'default' with: #('Full');
-            group: 'Core' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence');
-            group: 'Auth' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence' 'Blenny-Auth');
-            group: 'Full' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence' 'Blenny-Auth' 'Blenny-Announcements' 'Blenny-Middleware' 'Blenny-Modules');
-            group: 'WithSoil' with: #('Full' 'Blenny-Persistence-Soil').
+        "Groups"
+        spec group: 'default' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence' 'Blenny-Auth' 'Blenny-Announcements' 'Blenny-Middleware' 'Blenny-Modules').
+        spec group: 'Core' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence').
     ]
 ]
