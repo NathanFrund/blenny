@@ -22,10 +22,15 @@ BaselineOfBlenny >> baseline: spec [
         spec 
             baseline: 'Soil' 
             with: [ spec repository: 'github://ApptiveGrid/Soil:v4/src' ].
+        
+        "NEW: P3 PostgreSQL client"
+        spec 
+            baseline: 'P3' 
+            with: [ spec repository: 'github://svenvc/P3' ].
 
         "Internal Packages"
         spec package: 'Blenny-Config'.
-        spec package: 'Blenny-Persistence'.
+        spec package: 'Blenny-Persistence' with: [ spec requires: #('P3') ].
         spec package: 'Blenny-Core'.
         spec package: 'Blenny-Announcements'.
         spec package: 'Blenny-Auth'.
@@ -42,5 +47,8 @@ BaselineOfBlenny >> baseline: spec [
         "Groups"
         spec group: 'default' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence' 'Blenny-Auth' 'Blenny-Announcements' 'Blenny-Middleware' 'Blenny-Modules').
         spec group: 'Core' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence').
+        
+        "NEW: Group for PostgreSQL support (includes P3)"
+        spec group: 'PostgreSQL' with: #('Blenny-Persistence').
     ]
 ]

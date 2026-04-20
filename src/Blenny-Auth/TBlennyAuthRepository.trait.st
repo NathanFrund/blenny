@@ -1,5 +1,7 @@
 Trait {
 	#name : 'TBlennyAuthRepository',
+	#traits : 'TBlennyRepository',
+	#classTraits : 'TBlennyRepository classTrait',
 	#category : 'Blenny-Auth',
 	#package : 'Blenny-Auth'
 }
