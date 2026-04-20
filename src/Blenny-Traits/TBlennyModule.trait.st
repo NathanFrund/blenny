@@ -21,8 +21,8 @@ Your module can also use these provided methods:
 "
 Trait {
 	#name : 'TBlennyModule',
-	#category : 'Blenny-Core',
-	#package : 'Blenny-Core'
+	#category : 'Blenny-Traits',
+	#package : 'Blenny-Traits'
 }
 
 { #category : 'accessing' }

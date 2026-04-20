@@ -2,8 +2,8 @@ Trait {
 	#name : 'TBlennyAuthRepository',
 	#traits : 'TBlennyRepository',
 	#classTraits : 'TBlennyRepository classTrait',
-	#category : 'Blenny-Auth',
-	#package : 'Blenny-Auth'
+	#category : 'Blenny-Traits',
+	#package : 'Blenny-Traits'
 }
 
 { #category : 'blacklist' }

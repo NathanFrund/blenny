@@ -28,8 +28,8 @@ Example:
 "
 Trait {
 	#name : 'TBlennyRepository',
-	#category : 'Blenny-Persistence',
-	#package : 'Blenny-Persistence'
+	#category : 'Blenny-Traits',
+	#package : 'Blenny-Traits'
 }
 
 { #category : 'accessing' }
