@@ -19,9 +19,6 @@ BaselineOfBlenny >> baseline: spec [
         spec 
             baseline: 'Conduit' 
             with: [ spec repository: 'github://NathanFrund/Conduit:main/src' ].
-        spec 
-            baseline: 'Soil' 
-            with: [ spec repository: 'github://ApptiveGrid/Soil:v4/src' ].
         
         "NEW: P3 PostgreSQL client"
         spec 
