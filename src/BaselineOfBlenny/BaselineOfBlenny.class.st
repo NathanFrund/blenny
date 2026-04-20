@@ -19,33 +19,37 @@ BaselineOfBlenny >> baseline: spec [
         spec 
             baseline: 'Conduit' 
             with: [ spec repository: 'github://NathanFrund/Conduit:main/src' ].
-        
-        "NEW: P3 PostgreSQL client"
         spec 
             baseline: 'P3' 
             with: [ spec repository: 'github://svenvc/P3' ].
 
-        "Internal Packages"
-        spec package: 'Blenny-Config'.
-        spec package: 'Blenny-Persistence' with: [ spec requires: #('P3') ].
-        spec package: 'Blenny-Core'.
-        spec package: 'Blenny-Announcements'.
-        spec package: 'Blenny-Auth'.
-        spec package: 'Blenny-Middleware'.
-        spec package: 'Blenny-Modules'.
-
-        "Dependencies"
-        spec package: 'Blenny-Core' with: [ spec requires: #('Blenny-Config' 'Blenny-Persistence') ].
-        spec package: 'Blenny-Announcements' with: [ spec requires: #('Blenny-Core') ].
-        spec package: 'Blenny-Auth' with: [ spec requires: #('Blenny-Core' 'Blenny-Persistence') ].
-        spec package: 'Blenny-Middleware' with: [ spec requires: #('Blenny-Core') ].
-        spec package: 'Blenny-Modules' with: [ spec requires: #('Blenny-Core') ].
+        "Internal Packages - Requirements explicitly inlined to ensure Trait availability"
+        spec 
+            package: 'Blenny-Config';
+            
+            package: 'Blenny-Persistence' 
+                with: [ spec requires: #('P3') ];
+            
+            "Core requires Conduit because of TConduitRenderer and THtmxRenderer usage"
+            package: 'Blenny-Core' 
+                with: [ spec requires: #('Blenny-Config' 'Blenny-Persistence' 'Conduit') ];
+            
+            package: 'Blenny-Announcements' 
+                with: [ spec requires: #('Blenny-Core') ];
+            
+            package: 'Blenny-Auth' 
+                with: [ spec requires: #('Blenny-Core' 'Blenny-Persistence' 'JSONWebToken') ];
+            
+            package: 'Blenny-Middleware' 
+                with: [ spec requires: #('Blenny-Core' 'ZincHTTPComponents') ];
+            
+            package: 'Blenny-Modules' 
+                with: [ spec requires: #('Blenny-Core') ].
 
         "Groups"
-        spec group: 'default' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence' 'Blenny-Auth' 'Blenny-Announcements' 'Blenny-Middleware' 'Blenny-Modules').
-        spec group: 'Core' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence').
-        
-        "NEW: Group for PostgreSQL support (includes P3)"
-        spec group: 'PostgreSQL' with: #('Blenny-Persistence').
+        spec 
+            group: 'default' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence' 'Blenny-Auth' 'Blenny-Announcements' 'Blenny-Middleware' 'Blenny-Modules');
+            group: 'Core' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence');
+            group: 'PostgreSQL' with: #('Blenny-Persistence').
     ]
 ]
