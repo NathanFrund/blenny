@@ -9,55 +9,46 @@ Class {
 BaselineOfBlenny >> baseline: spec [
     <baseline>
     spec for: #common do: [
-        "1. External Dependencies"
+        "External Dependencies"
         spec 
             baseline: 'ZincHTTPComponents' 
-            with: [ spec repository: 'github://svenvc/zinc/repository' ];
-            baseline: 'JSONWebToken' 
-            with: [ spec repository: 'github://ba-st-dependencies/JSONWebToken:v3' ];
-            baseline: 'Conduit' 
-            with: [ spec repository: 'github://NathanFrund/Conduit:main/src' ];
-				baseline: 'Soil' 
-            with: [ spec repository: 'github://ApptiveGrid/Soil:v4/src' ].
-
-        "2. Internal Package Topology"
-        
-        "Config is the foundation"
-        spec package: 'Blenny-Config'.
-        
-        "Persistence provides storage contracts"
-        spec package: 'Blenny-Persistence'.
-
-        "Core contains the App, Router, Bridges, and Handlers. 
-         It requires Config, Persistence, and the external web/asset tools."
-        spec package: 'Blenny-Core' with: [ 
-            spec requires: #('Blenny-Config' 'Blenny-Persistence' 'ZincHTTPComponents' 'Conduit').
-            spec includes: #('ZincHTTPComponents' -> #('WebSocket')) ].
-
-        "Announcements provides the specialized messaging types 
-         referenced by BlennyAnnouncerBridge."
-        spec package: 'Blenny-Announcements' with: [ 
-            spec requires: #('Blenny-Core') ].
-
-        "Auth contains the login/logout logic and providers.
-         It depends on Core, Persistence, and JWT for tokens."
-        spec package: 'Blenny-Auth' with: [ 
-            spec requires: #('Blenny-Core' 'Blenny-Persistence' 'JSONWebToken') ].
-
-        "Middleware provides composable request filters"
-        spec package: 'Blenny-Middleware' with: [
-            spec requires: #('Blenny-Core') ].
-
-        "Modules provides pluggable application components"
-        spec package: 'Blenny-Modules' with: [
-            spec requires: #('Blenny-Core' 'Blenny-Auth') ].
-
-        "3. Groups"
+            with: [ spec repository: 'github://svenvc/zinc/repository' ].
         spec 
-            group: 'default' with: #('Full');
-            group: 'Core' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence');
-            group: 'Auth' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence' 'Blenny-Auth');
-            group: 'Full' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence' 'Blenny-Auth' 'Blenny-Announcements' 'Blenny-Middleware' 'Blenny-Modules');
-				group: 'WithSoil' with: #('Full' 'Blenny-Persistence-Soil').
+            baseline: 'JSONWebToken' 
+            with: [ spec repository: 'github://ba-st-dependencies/JSONWebToken:v3' ].
+        spec 
+            baseline: 'Conduit' 
+            with: [ spec repository: 'github://NathanFrund/Conduit:main/src' ].
+        spec 
+            baseline: 'Soil' 
+            with: [ spec repository: 'github://ApptiveGrid/Soil:v4/src' ].
+        
+        "NEW: P3 PostgreSQL client"
+        spec 
+            baseline: 'P3' 
+            with: [ spec repository: 'github://svenvc/P3' ].
+
+        "Internal Packages"
+        spec package: 'Blenny-Config'.
+        spec package: 'Blenny-Persistence' with: [ spec requires: #('P3') ].
+        spec package: 'Blenny-Core'.
+        spec package: 'Blenny-Announcements'.
+        spec package: 'Blenny-Auth'.
+        spec package: 'Blenny-Middleware'.
+        spec package: 'Blenny-Modules'.
+
+        "Dependencies"
+        spec package: 'Blenny-Core' with: [ spec requires: #('Blenny-Config' 'Blenny-Persistence') ].
+        spec package: 'Blenny-Announcements' with: [ spec requires: #('Blenny-Core') ].
+        spec package: 'Blenny-Auth' with: [ spec requires: #('Blenny-Core' 'Blenny-Persistence') ].
+        spec package: 'Blenny-Middleware' with: [ spec requires: #('Blenny-Core') ].
+        spec package: 'Blenny-Modules' with: [ spec requires: #('Blenny-Core') ].
+
+        "Groups"
+        spec group: 'default' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence' 'Blenny-Auth' 'Blenny-Announcements' 'Blenny-Middleware' 'Blenny-Modules').
+        spec group: 'Core' with: #('Blenny-Core' 'Blenny-Config' 'Blenny-Persistence').
+        
+        "NEW: Group for PostgreSQL support (includes P3)"
+        spec group: 'PostgreSQL' with: #('Blenny-Persistence').
     ]
 ]

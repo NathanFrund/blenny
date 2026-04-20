@@ -62,7 +62,9 @@ Blenny is designed so that **business logic doesn't need to know about the trans
 ```smalltalk
 Metacello new
     baseline: 'Blenny';
-    repository: 'github://NathanFrund/Blenny';
+    repository: 'github://NathanFrund/Blenny:main/src';
+    onConflict: [ :ex | ex useIncoming ];
+    onUpgrade: [ :ex | ex useIncoming ];
     load.
 ```
 
@@ -95,11 +97,11 @@ DashboardModule >> handleDashboard: request
     "The Trait provides the user and handles the redirect if missing"
     user := self authenticatedUserFrom: request.
     user ifNil: [ ^ ZnResponse redirect: '/login' ].
-    
-    "The Trait automatically detects if this is an HTMX request 
+
+    "The Trait automatically detects if this is an HTMX request
      and wraps the result in a proper ZnResponse object"
-    ^ self renderPage: 'dashboard' 
-        context: { 'username' -> user } asDictionary 
+    ^ self renderPage: 'dashboard'
+        context: { 'username' -> user } asDictionary
         request: request
 ```
 
@@ -109,11 +111,11 @@ Create `blenny.json` in your working directory:
 
 ```json
 {
-    "server.port": 8081,
-    "server.bind_address": "0.0.0.0",
-    "auth.jwt_secret": "your-secret-key",
-    "auth.session_duration_hours": 720,
-    "dev_mode": true
+  "server.port": 8081,
+  "server.bind_address": "0.0.0.0",
+  "auth.jwt_secret": "your-secret-key",
+  "auth.session_duration_hours": 720,
+  "dev_mode": true
 }
 ```
 
@@ -164,5 +166,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
 ```
 
+```
