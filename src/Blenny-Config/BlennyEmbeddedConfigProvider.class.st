@@ -36,7 +36,8 @@ BlennyEmbeddedConfigProvider >> defaults [
 		  ('server.bind_address' -> '0.0.0.0').
 		  ('auth.jwt_secret' -> 'CHANGE-ME-EMBEDDED-DEFAULT').
 		  ('auth.session_duration_hours' -> 720).
-		  ('dev_mode' -> true) } asDictionary
+		  ('dev_mode' -> true).
+		  ('sse.encoder' -> 'BlennyStandardSSEEncoder') } asDictionary
 ]
 
 { #category : 'testing' }

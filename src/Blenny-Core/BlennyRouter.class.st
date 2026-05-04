@@ -1,20 +1,24 @@
 "
-I am the HTTP request router for Blenny.
+I am the HTTP request router for Blenny (SSE‑first, WebSocket‑optional).
 
 I handle:
 - Routing HTTP requests to handlers
-- WebSocket upgrade requests
+- Server‑Sent Events (/sse) – always available
+- WebSocket upgrade requests – only if WebSockets are enabled
 - Static file serving
 - Module-registered routes
 - Authentication via cookie/URL token
 
 Routes are checked in this order:
-1. Module-registered routes (registerGet:/registerPost:)
-2. WebSocket (/ws/*)
-3. Static files (/static/*)
-4. Home (/)
-5. Login/Register/Logout
-6. 404
+1. Module-registered routes
+2. SSE (/sse)
+3. WebSocket (/ws/*) – conditional
+4. Static files (/static/*)
+5. Home (/)
+6. Login/Register/Logout
+7. 404
+
+I rely on the BlennyWebApp reference to access the current transports.
 "
 Class {
 	#name : 'BlennyRouter',
@@ -22,8 +26,7 @@ Class {
 	#instVars : [
 		'rootPath',
 		'renderer',
-		'htmlBridge',
-		'dataBridge',
+		'app',
 		'loginHandler',
 		'logoutHandler',
 		'registerHandler',
@@ -33,6 +36,11 @@ Class {
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
 }
+
+{ #category : 'accessing' }
+BlennyRouter >> app [
+   ^ app
+]
 
 { #category : 'middleware' }
 BlennyRouter >> applyGlobalMiddlewareTo: aBlock [
@@ -44,16 +52,6 @@ BlennyRouter >> applyGlobalMiddlewareTo: aBlock [
         previousHandler := wrapped. 
         wrapped := [ :req | mw value: previousHandler value: req ] ].
     ^ wrapped
-]
-
-{ #category : 'accessing' }
-BlennyRouter >> dataBridge [
-	^ dataBridge
-]
-
-{ #category : 'accessing' }
-BlennyRouter >> dataBridge: aBridge [
-	dataBridge := aBridge 
 ]
 
 { #category : 'authentication' }
@@ -69,7 +67,6 @@ BlennyRouter >> ensureResponse: anObject [
 BlennyRouter >> extractTokenFrom: request [
     "Extract JWT token from URL or cookie"
     | token |
-	Transcript show: 'Router extractTokenFrom called'; cr.
     token := request uri queryAt: 'token' ifAbsent: [ nil ].
     token ifNil: [ token := BlennyMiddleware extractTokenFromCookie: request ].
     ^ token
@@ -82,43 +79,73 @@ BlennyRouter >> handleNotFound: request [
 
 { #category : 'handlers' }
 BlennyRouter >> handleRequest: request [
+   | path |
+   path := request uri pathPrintString.
 
-	| path |
-	path := request uri pathPrintString.
-	
-	"1. Check module-registered routes first"
-    routes do: [ :route |
-        (path = (route at: 'path') and: [ request method = (route at: 'method') ]) ifTrue: [
-            ^ self ensureResponse: ((route at: 'handler') value: request) ] ].
+   "1. Module-registered routes"
+   routes do: [ :route |
+      (path = (route at: 'path') and: [ request method = (route at: 'method') ]) ifTrue: [
+         ^ self ensureResponse: ((route at: 'handler') value: request) ] ].
 
-	"2. WebSocket and static routes (direct handlers)"
-	(path beginsWith: '/ws/') ifTrue: [ ^ self handleWebSocket: request ].
-	(path beginsWith: '/static/') ifTrue: [ ^ self handleStatic: request ].
+   "2. SSE endpoint – always available"
+   (path beginsWith: '/sse') ifTrue: [ ^ self handleSSE: request ].
 
-	"3. Home route"
-	(path = '/' or: [ path isEmpty ]) ifTrue: [
-			^ self ensureResponse:
-				  (renderer renderPage: 'index' context: Dictionary new) ].
+   "3. WebSocket endpoint – only if WebSocket bridge is enabled"
+   (path beginsWith: '/ws/') ifTrue: [ ^ self handleWebSocket: request ].
 
-	"4. Login routes"
-	(path = '/login' and: [ request method = #GET ]) ifTrue: [
-		^ self ensureResponse: (loginHandler handleGet: request) ].
-	(path = '/login' and: [ request method = #POST ]) ifTrue: [
-		^ self ensureResponse: (loginHandler handlePost: request) ].
+   "4. Static files"
+   (path beginsWith: '/static/') ifTrue: [ ^ self handleStatic: request ].
 
-	"5. Register routes"
-	(path = '/register' and: [ request method = #GET ]) ifTrue: [
-		^ self ensureResponse: (registerHandler handleGet: request) ].
-	(path = '/register' and: [ request method = #POST ]) ifTrue: [
-		^ self ensureResponse: (registerHandler handlePost: request) ].
+   "5. Home"
+   (path = '/' or: [ path isEmpty ]) ifTrue: [
+      ^ self ensureResponse: (renderer renderPage: 'index' context: Dictionary new) ].
 
-	"6. Logout route - accept GET or POST"
-	(path = '/logout' and: [
-		 request method = #GET or: [ request method = #POST ] ]) ifTrue: [
-		^ self ensureResponse: (logoutHandler handlePost: request) ].
+   "6. Login"
+   (path = '/login' and: [ request method = #GET ]) ifTrue: [
+      ^ self ensureResponse: (loginHandler handleGet: request) ].
+   (path = '/login' and: [ request method = #POST ]) ifTrue: [
+      ^ self ensureResponse: (loginHandler handlePost: request) ].
 
-	"7. 404"
-	^ ZnResponse notFound: path
+   "7. Register"
+   (path = '/register' and: [ request method = #GET ]) ifTrue: [
+      ^ self ensureResponse: (registerHandler handleGet: request) ].
+   (path = '/register' and: [ request method = #POST ]) ifTrue: [
+      ^ self ensureResponse: (registerHandler handlePost: request) ].
+
+   "8. Logout"
+   (path = '/logout' and: [ request method = #GET or: [ request method = #POST ] ]) ifTrue: [
+      ^ self ensureResponse: (logoutHandler handlePost: request) ].
+
+(path = '/demo' and: [ request method = #GET ]) ifTrue: [
+    ^ self ensureResponse: (renderer renderPage: 'demo' context: Dictionary new)
+].
+
+   "9. 404"
+   ^ ZnResponse notFound: path
+]
+
+{ #category : 'handlers' }
+BlennyRouter >> handleSSE: request [
+   | userId intents bridge entity response |
+   
+   "Authenticate the SSE request using the standard token extraction + validation"
+   userId := loginHandler authProvider validateToken: (self extractTokenFrom: request).
+   userId ifNil: [ ^ ZnResponse unauthorized: 'Invalid or missing token' ].
+   
+   intents := self intentsFromRequest: request defaults: #(ui).
+   bridge := self sseBridge.
+
+   entity := DatastarLiveEntity updateBlock: [ :socketStream |
+      self runSSEStream: socketStream forUser: userId withBridge: bridge intents: intents.
+   ].
+
+   response := ZnResponse ok: entity.
+   response headers
+      at: 'Content-Type' put: 'text/event-stream; charset=utf-8';
+      at: 'Cache-Control' put: 'no-cache';
+      at: 'Connection' put: 'keep-alive'.
+   ^ response
+
 ]
 
 { #category : 'handlers' }
@@ -140,51 +167,49 @@ BlennyRouter >> handleStatic: request [
 
 { #category : 'handlers' }
 BlennyRouter >> handleWebSocket: request [
-    | token userId wsType bridge |
-    
-    wsType := (request uri segments size > 1 and: [ request uri segments second isString ])
-        ifTrue: [ request uri segments second ]
-        ifFalse: [ 'html' ].
-    
-    token := self extractTokenFrom: request.
-    token ifNil: [ ^ ZnResponse unauthorized: 'Missing token' ].
-    
-    userId := loginHandler authProvider validateToken: token.
-    userId ifNil: [ ^ ZnResponse unauthorized: 'Invalid token' ].
-    
-    ((request headers at: 'Upgrade' ifAbsent: [ '' ]) asLowercase includesSubstring: 'websocket')
-        ifFalse: [ ^ ZnResponse badRequest: request ].
-    
-    bridge := wsType = 'html' ifTrue: [ htmlBridge ] ifFalse: [ dataBridge ].
-    bridge ifNil: [ ^ ZnResponse serverError: 'Bridge not configured' ].
-    
-    ^ (ZnWebSocketDelegate handler: [ :webSocket |
-        bridge handleWebSocket: webSocket forUser: userId ]) 
+   | token userId wsType bridge intents |
+   wsType := (request uri segments size > 1 and: [ request uri segments second isString ])
+      ifTrue: [ request uri segments second ]
+      ifFalse: [ 'html' ].
+
+   token := self extractTokenFrom: request.
+   token ifNil: [ ^ ZnResponse unauthorized: 'Missing token' ].
+
+   userId := loginHandler authProvider validateToken: token.
+   userId ifNil: [ ^ ZnResponse unauthorized: 'Invalid token' ].
+
+   ((request headers at: 'Upgrade' ifAbsent: [ '' ]) asLowercase includesSubstring: 'websocket')
+      ifFalse: [ ^ ZnResponse badRequest: request ].
+
+   "Retrieve the optional WebSocket bridge"
+   bridge := self wsBridge.
+   bridge ifNil: [ ^ ZnResponse notFound: 'WebSocket not enabled' ].
+
+   "Parse intents, default to #all for backward compatibility"
+   intents := self intentsFromRequest: request defaults: #(all).
+
+   ^ (ZnWebSocketDelegate handler: [ :webSocket |
+        bridge handleWebSocket: webSocket forUser: userId intents: intents ])
         handleRequest: request
-]
-
-{ #category : 'accessing' }
-BlennyRouter >> htmlBridge [
-	^ htmlBridge
-]
-
-{ #category : 'accessing' }
-BlennyRouter >> htmlBridge: aBridge [
-	htmlBridge := aBridge
 ]
 
 { #category : 'initialization' }
 BlennyRouter >> initializeWith: aDictionary [
+   renderer := aDictionary at: 'renderer'.
+   loginHandler := aDictionary at: 'loginHandler'.
+   registerHandler := aDictionary at: 'registerHandler'.
+   logoutHandler := aDictionary at: 'logoutHandler'.
+   app := aDictionary at: 'app'.               "Reference to the BlennyWebApp"
+   rootPath := aDictionary at: 'rootPath' ifAbsent: [ nil ].
+   routes := OrderedCollection new.
+   globalMiddleware := OrderedCollection new.
+]
 
-	renderer := aDictionary at: 'renderer'.
-	loginHandler := aDictionary at: 'loginHandler'.
-	registerHandler := aDictionary at: 'registerHandler'.
-	logoutHandler := aDictionary at: 'logoutHandler'.
-	htmlBridge := aDictionary at: 'htmlBridge'.
-	dataBridge := aDictionary at: 'dataBridge'.
-	rootPath := aDictionary at: 'rootPath' ifAbsent: [ nil ].
-	routes := OrderedCollection new.
-	globalMiddleware := OrderedCollection new.
+{ #category : 'handlers' }
+BlennyRouter >> intentsFromRequest: request defaults: aCollection [
+   ^ (request uri queryAt: 'intent' ifAbsent: [ nil ])
+      ifNotNil: [ :s | (s substrings: ',') collect: #asSymbol ]
+      ifNil: [ aCollection ]
 ]
 
 { #category : 'module-registration' }
@@ -220,8 +245,47 @@ BlennyRouter >> routes [
 	^ routes.
 ]
 
+{ #category : 'handlers' }
+BlennyRouter >> runSSEStream: socketStream forUser: userId withBridge: bridge intents: intents [
+   [
+      bridge addSSEStream: socketStream forUser: userId intents: intents.
+      
+      "Give the client a moment to be ready for signals"
+      (Delay forMilliseconds: 100) wait.
+
+      bridge
+         directMessage: (Dictionary new
+            at: #signals put: { #connected -> true } asDictionary;
+            at: #category put: #ui;
+            yourself)
+         to: userId.
+
+      "Idle forever: Datastar holds the connection; a periodic comment prevents proxy timeouts"
+      [ true ] whileTrue: [
+         (Delay forSeconds: 15) wait.
+         socketStream nextPutAll: ': keep-alive'; nextPutAll: String crlf; nextPutAll: String crlf; flush ]
+   ] ensure: [
+      bridge removeConnection: socketStream forUser: userId.
+      socketStream close.
+   ].
+]
+
+{ #category : 'as yet unclassified' }
+BlennyRouter >> sseBridge [
+   "The always‑present SSE bridge"
+   ^ app sseBridge
+]
+
 { #category : 'middleware' }
 BlennyRouter >> use: aMiddleware [
     "Add global middleware"
     globalMiddleware add: aMiddleware.
+]
+
+{ #category : 'as yet unclassified' }
+BlennyRouter >> wsBridge [
+   "The optional WebSocket sidecar, if enabled"
+   ^ app optionalTransports
+      detect: [ :each | each isKindOf: BlennyWebSocketBridge ]
+      ifNone: [ nil ]
 ]

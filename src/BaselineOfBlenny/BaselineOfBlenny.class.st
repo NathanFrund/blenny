@@ -14,13 +14,18 @@ BaselineOfBlenny >> baseline: spec [
             baseline: 'NeoJSON'
             with: [ spec repository: 'github://svenvc/NeoJSON/repository' ];
             baseline: 'ZincHTTPComponents'
-            with: [ spec repository: 'github://svenvc/zinc/repository' ];
+            with: [ 
+					spec repository: 'github://svenvc/zinc/repository';
+					loads: #('Core' 'WebSocket')
+				];
             baseline: 'JSONWebToken'
             with: [ spec repository: 'github://ba-st-dependencies/JSONWebToken:v3' ];
             baseline: 'Conduit'
             with: [ spec repository: 'github://NathanFrund/Conduit:main/src' ];
             baseline: 'P3' 
-            with: [ spec repository: 'github://svenvc/P3' ].
+            with: [ spec repository: 'github://svenvc/P3' ];
+				baseline: 'DatastarSDK'
+            with: [ spec repository: 'github://NathanFrund/Datastar-Pharo-SDK:main/src' ].
 
         "Internal Packages"
         spec
@@ -49,7 +54,10 @@ BaselineOfBlenny >> baseline: spec [
             with: [ spec requires: #( 'Blenny-Core' 'ZincHTTPComponents' ) ];
             
             package: 'Blenny-Modules'
-            with: [ spec requires: #( 'Blenny-Core' 'Blenny-Persistence' ) ].
+            with: [ spec requires: #( 'Blenny-Core' 'Blenny-Persistence' ) ];
+
+				package: 'Blenny-Datastar'
+            with: [ spec requires: #( 'Blenny-Core' 'DatastarSDK' ) ].
 
         "Groups"
         spec
@@ -59,5 +67,6 @@ BaselineOfBlenny >> baseline: spec [
                    'Blenny-Modules' );
             group: 'Core'
             with: #( 'Blenny-Traits' 'Blenny-Core' 'Blenny-Config' 'Blenny-Persistence' );
-            group: 'PostgreSQL' with: #( 'Blenny-Persistence' ) ]
+            group: 'PostgreSQL' with: #( 'Blenny-Persistence' ) ];
+				group: 'Datastar' with: #( 'Blenny-Datastar' ).
 ]

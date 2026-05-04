@@ -29,8 +29,8 @@ Class {
 		'registerHandler',
 		'loginHandler',
 		'logoutHandler',
-		'htmlBridge',
-		'dataBridge',
+		'sseBridge',
+		'optionalTransports',
 		'modules',
 		'router'
 	],
@@ -54,14 +54,33 @@ BlennyWebApp >> authProvider [
     ^ authProvider
 ]
 
+{ #category : 'broadcasting' }
+BlennyWebApp >> broadcast: aMessage toUser: aUserId [
+   | allTransports |
+   allTransports := { sseBridge }, optionalTransports.
+   allTransports do: [ :transport |
+      (transport hasConnectionForUser: aUserId) ifTrue: [
+         [ transport directMessage: aMessage to: aUserId ]
+            on: Error do: [ :e | Transcript show: transport transportName, ' failed: ', e messageText ]
+      ] ]
+]
+
 { #category : 'publishing' }
 BlennyWebApp >> broadcastData: aString [
-    self dataBridge publish: (BlennyDataBroadcast payload: aString)
+    self broadcastMessage: (Dictionary with: #signals -> aString with: #category -> #ui)
 ]
 
 { #category : 'publishing' }
 BlennyWebApp >> broadcastHtml: aString [
-    self htmlBridge publish: (BlennyHTMLBroadcast payload: aString)
+    self broadcastMessage: (Dictionary with: #html -> aString with: #category -> #ui)
+]
+
+{ #category : 'broadcasting' }
+BlennyWebApp >> broadcastMessage: aMessage [
+   { sseBridge }, optionalTransports do: [ :transport |
+      [ transport broadcastMessage: aMessage ]
+         on: Error do: [ :e | Transcript show: transport transportName, ' broadcast failed: ', e messageText ]
+   ]
 ]
 
 { #category : 'accessing' }
@@ -90,40 +109,24 @@ BlennyWebApp >> createAuthProvider [
 	^ auth
 ]
 
-{ #category : 'accessing' }
-BlennyWebApp >> dataBridge [
-	^ dataBridge
-]
-
-{ #category : 'accessing' }
-BlennyWebApp >> dataBridge: aBridge [
-	dataBridge := aBridge 
-]
-
 { #category : 'publishing' }
 BlennyWebApp >> directData: aString toUser: aUserId [
-    self dataBridge publish: (BlennyDataDirect payload: aString toUser: aUserId)
+   self
+      broadcast: (Dictionary with: #signals -> aString with: #category -> #ui)
+      toUser: aUserId
 ]
 
 { #category : 'publishing' }
 BlennyWebApp >> directHtml: aString toUser: aUserId [
-    self htmlBridge publish: (BlennyHTMLDirect payload: aString toUser: aUserId)
+    self
+      broadcast: (Dictionary with: #html -> aString with: #category -> #ui)
+      toUser: aUserId
 ]
 
 { #category : 'modules' }
 BlennyWebApp >> discoverModules [
     "Find all classes that use TBlennyModule"
     ^ TBlennyModule users
-]
-
-{ #category : 'accessing' }
-BlennyWebApp >> htmlBridge [
-	^ htmlBridge 
-]
-
-{ #category : 'accessing' }
-BlennyWebApp >> htmlBridge: aBridge [
-	htmlBridge := aBridge 
 ]
 
 { #category : 'initialization' }
@@ -157,6 +160,11 @@ BlennyWebApp >> loadModules [
     modules := OrderedCollection new.
     self discoverModules do: [ :moduleClass |
         self loadModule: moduleClass ]
+]
+
+{ #category : 'accessing' }
+BlennyWebApp >> optionalTransports [
+   ^ optionalTransports
 ]
 
 { #category : 'modules' }
@@ -204,6 +212,11 @@ BlennyWebApp >> setupDiskWatcher [
     conduit start.
 ]
 
+{ #category : 'accessing' }
+BlennyWebApp >> sseBridge [
+    ^ sseBridge
+]
+
 { #category : 'modules' }
 BlennyWebApp >> startModules [
     modules do: [ :module | module startModule ]
@@ -228,16 +241,24 @@ BlennyWebApp >> startOn: aPath port: aPortNumber [
 { #category : 'server' }
 BlennyWebApp >> startServer [
 
-	| bindAddress |
+	| bindAddress encoderClass |
+	
+	BlennyConfig reset.
+	
 	ZnServer allInstancesDo: [ :s | s port = port ifTrue: [ s stop ] ].
 
 	bindAddress := BlennyConfig current bindAddress.
 
-	"Create bridges"
-	htmlBridge := BlennyAnnouncerBridge new initializeWithEndpoint:
-		              'html'.
-	dataBridge := BlennyAnnouncerBridge new initializeWithEndpoint:
-		              'data'.
+	encoderClass := Smalltalk at: (BlennyConfig current
+			                 at: 'sse.encoder'
+			                 ifAbsent: [ #BlennyStandardSSEEncoder ]) asSymbol.
+			
+	sseBridge := BlennySSEBridge new
+		             initializeWithEncoder: encoderClass new name: 'sse';
+		             start.
+
+	"Optional transports (WebSocket sidecar, initially empty)"
+	optionalTransports := OrderedCollection new.
 
 	"Create renderer (conduit is now available)"
 	renderer := BlennyRenderer new
@@ -266,12 +287,12 @@ BlennyWebApp >> startServer [
 			          ('loginHandler' -> loginHandler).
 			          ('registerHandler' -> registerHandler).
 			          ('logoutHandler' -> logoutHandler).
-			          ('htmlBridge' -> htmlBridge).
-			          ('dataBridge' -> dataBridge).
+			          ('app' -> self). "allows router to fetch bridges on demand"
 			          ('rootPath' -> rootPath) } asDictionary.
-			
+
 	"Setup middleware on router"
-    self setupDefaultMiddlewareOn: router.
+	self setupDefaultMiddlewareOn: router.
+	self registerModulesWithRouter: router.
 
 	"===== REGISTER MODULES WITH ROUTER ====="
 	self registerModulesWithRouter: router.
@@ -284,51 +305,45 @@ BlennyWebApp >> startServer [
 	server delegate: router.
 	server start.
 
-	self htmlBridge: htmlBridge.
-	self dataBridge: dataBridge.
-
 	Transcript
 		show: '========================================';
-		cr.
-	Transcript
+		cr;
 		show: 'Blenny server started on port ' , port asString;
-		cr.
-	Transcript
-		show: 'HTML WebSocket: ws://localhost:' , port asString , '/ws/html';
-		cr.
-	Transcript
-		show: 'Data WebSocket: ws://localhost:' , port asString , '/ws/data';
-		cr.
-	Transcript
+		cr;
+		show: 'SSE endpoint: http://localhost:' , port asString , '/sse';
+		cr;
+		show:
+			'WebSocket (optional): enable via #enableWebSocketsWithDefaultIntents:';
+		cr;
 		show: '========================================';
 		cr
 ]
 
 { #category : 'server' }
 BlennyWebApp >> stop [
-
 	"Stop modules first (so they can clean up)"
-    modules do: [ :module | module stopModule ].
-    
-    "Stop bridges (close WebSocket connections)"
-    htmlBridge ifNotNil: [ htmlBridge stop ].
-    dataBridge ifNotNil: [ dataBridge stop ].
 
+	modules do: [ :module | module stopModule ].
 
 	"Stop HTTP server"
-    server ifNotNil: [ 
-        server stop.
-        server := nil ].
+	server ifNotNil: [
+			server stop.
+			server := nil ].
 
 	"Stop Conduit file watcher"
-    conduit ifNotNil: [ 
-        conduit stop.
-        conduit := nil ].
+	conduit ifNotNil: [
+			conduit stop.
+			conduit := nil ].
 
 	"Stop auth janitor"
-    authProvider shutdown.
+	authProvider shutdown.
 
-    Transcript show: 'Blenny server stopped.'; cr.
+	"Reset config so next start sees fresh values (e.g. blenny.json changes)"
+	BlennyConfig reset.
+
+	Transcript
+		show: 'Blenny server stopped.';
+		cr
 ]
 
 { #category : 'modules' }
