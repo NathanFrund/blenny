@@ -14,7 +14,7 @@ Build reactive applications with minimal effort and maximum reliability.
 
 - **SSE‑first by default** – resilient, auto‑reconnecting, browser‑native push with zero custom JavaScript
 - **Pluggable transport encoders** – plain SSE for HTMX / vanilla, or Datastar for hypermedia gloss
-- **Optional WebSocket sidecar** – enable bidirectional channels when you need them
+- **Optional WebSockets** – enable bidirectional channels when you need them
 - **HTMX integration** – build interactive UIs without writing JavaScript
 - **JWT authentication** – stateless, secure, configurable sessions
 - **Pluggable modules** – auto‑discovered, zero‑configuration modules
@@ -33,39 +33,39 @@ Whether you're responding to an HTTP GET, an HTMX fragment request, or pushing a
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Browser (HTMX / Datastar)                                   │
-│ SSE connection always active                                │
+│                  Browser (HTMX / Datastar)                  │
+│                 SSE connection always active                │
 └─────────────────────────────────────────────────────────────┘
-│
-▼
+                              │
+                              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Middleware Pipeline                                         │
-│ (Logging → Auth → Security → Rate Limiting)                 │
+│                     Middleware Pipeline                     │
+│         (Logging → Auth → Security → Rate Limiting)         │
 └─────────────────────────────────────────────────────────────┘
-│
-▼
+                              │
+                              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ BlennyRouter                                                │
-│ (Routes → SSE handler → Module Dispatcher → 404)            │
+│                        BlennyRouter                         │
+│      (Routes → SSE handler → Module Dispatcher → 404)       │
 └─────────────────────────────────────────────────────────────┘
-│
-▼
+                              │
+                              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ BlennyTransportBridge                                       │
-│ (BlennySSEBridge / BlennyWebSocketBridge)                   │
-│ Encoder strategy plugs in at runtime                        │
+│                    BlennyTransportBridge                    │
+│         (BlennySSEBridge / BlennyWebSocketBridge)           │
+│            Encoder strategy plugs in at runtime             │
 └─────────────────────────────────────────────────────────────┘
-│
-▼
+                              │
+                              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ TBlennyModule (Trait)                                       │
-│ (Auth helper, ZnResponse wrapping, HTMX)                    │
+│                    TBlennyModule (Trait)                    │
+│          (Auth helper, ZnResponse wrapping, HTMX)           │
 └─────────────────────────────────────────────────────────────┘
-│
-▼
+                              │
+                              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Your Module Handler                                         │
-│ (Pure business logic)                                       │
+│                     Your Module Handler                     │
+│                    (Pure business logic)                    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -94,7 +94,7 @@ Metacello new
     load: 'Datastar'.
 ```
 
-Make sure you set the encoder as outlined below.   
+Make sure you set `sse.encoder` as outlined below.   
 
 ### Start a server
 
@@ -215,7 +215,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-```
-
-```
