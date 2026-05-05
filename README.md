@@ -148,6 +148,54 @@ DashboardModule >> handleDashboard: request
         request: request
 ```
 
+## Connection Intents
+
+Each real‑time connection can subscribe to one or more **intents** – categories of messages
+it wants to receive. Clients specify their intents via the `?intent=` query parameter
+(comma‑separated). Available intents:
+
+- `ui` – HTML fragments and signal updates intended for DOM patches
+- `command` – bidirectional request/response traffic (e.g., WebSocket API calls)
+- `notification` – system alerts, toasts, or other notification‑style messages
+- `all` – receive every message, regardless of category
+
+**Defaults per endpoint**
+
+| Endpoint | Default intents | Behavior |
+|----------|----------------|----------|
+| `/sse` | `ui` | Receives only UI updates unless overridden |
+| `/ws/html`, `/ws/data` | `all` | Backward‑compatible – receives everything |
+
+**Examples**
+
+`/sse` → UI updates only 
+
+`/sse?intent=ui,notification` → UI updates and notifications
+
+`/ws/html?intent=command` → only command‑category messages
+
+`/ws/data?intent=all` → everything (explicit default)
+
+A single user can open multiple connections with different intents (e.g., an SSE stream
+for live UI patches and a WebSocket for chat commands) without receiving duplicate updates.
+
+**Publishing with a custom category**
+
+Every message you publish carries a `#category` key. To target a specific intent group,
+include the matching category. For example, to send a Datastar script (which will be
+delivered as a `datastar-execute-script` event) only to connections subscribed to
+`command`:
+
+```smalltalk
+BlennyPublisher publishMessage: {
+    #script -> 'console.log("Ran command!")'.
+    #category -> #command
+} asDictionary toUser: 'alice'.
+```
+
+The intent filter acts before the encoder, so you can use this pattern with any payload
+(HTML, signals, scripts) and any transport.
+
 ## SSE and Encoders
 Blenny ships with a **brand‑neutral standard encoder** that produces plain SSE (event: message), compatible with HTMX and vanilla EventSource.
 
