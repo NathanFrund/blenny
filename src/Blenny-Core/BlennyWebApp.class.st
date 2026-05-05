@@ -48,15 +48,14 @@ BlennyWebApp class >> default [
 
 { #category : 'server' }
 BlennyWebApp >> announceStarted [
-   | mode |
-   mode := rootPath ifNil: [ 'frozen' ] ifNotNil: [ 'disk' ].
-   Transcript
-      show: 'Blenny server started on port ';
-      show: port asString;
-      show: ' (';
-      show: mode;
-      show: ' mode)';
-      cr.
+
+	| mode |
+	mode := rootPath ifNil: [ 'frozen' ] ifNotNil: [ 'disk' ].
+	StringSignal emit:
+		('Server started on port {1} ({2} mode). SSE: http://localhost:{1}/sse'
+			 format: {
+					 port.
+					 mode })
 ]
 
 { #category : 'accessing' }
@@ -66,18 +65,19 @@ BlennyWebApp >> authProvider [
 
 { #category : 'broadcasting' }
 BlennyWebApp >> broadcast: aMessage toUser: aUserId [
-   | allTransports |
-   allTransports := { sseBridge }, optionalTransports.
-   allTransports do: [ :transport |
-      (transport hasConnectionForUser: aUserId) ifTrue: [
-         [ transport directMessage: aMessage to: aUserId ]
-            on: Error do: [ :e |
-               Transcript
-                  show: transport transportName;
-                  show: ' failed: ';
-                  show: e messageText;
-                  cr ] ] ].
-   ^ self
+
+	| allTransports |
+	allTransports := { sseBridge } , optionalTransports.
+	allTransports do: [ :transport |
+			(transport hasConnectionForUser: aUserId) ifTrue: [
+					[ transport directMessage: aMessage to: aUserId ]
+						on: Error
+						do: [ :e |
+								StringSignal emit: ('{1} failed for user {2}: {3}' format: {
+											 transport transportName.
+											 aUserId.
+											 e messageText }) ] ] ].
+	^ self
 ]
 
 { #category : 'publishing' }
@@ -92,15 +92,15 @@ BlennyWebApp >> broadcastHtml: aString [
 
 { #category : 'broadcasting' }
 BlennyWebApp >> broadcastMessage: aMessage [
-   { sseBridge }, optionalTransports do: [ :transport |
-      [ transport broadcastMessage: aMessage ]
-         on: Error do: [ :e |
-            Transcript
-               show: transport transportName;
-               show: ' broadcast failed: ';
-               show: e messageText;
-               cr ] ].
-   ^ self
+
+	{ sseBridge } , optionalTransports do: [ :transport |
+			[ transport broadcastMessage: aMessage ]
+				on: Error
+				do: [ :e |
+						StringSignal emit: ('{1} broadcast failed: {2}' format: {
+									 transport transportName.
+									 e messageText }) ] ].
+	^ self
 ]
 
 { #category : 'accessing' }
@@ -190,7 +190,7 @@ BlennyWebApp >> loadModule: aModuleClass [
     
     module initializeModule.
     modules add: module.
-    Transcript show: 'Loaded module: ', module moduleName; cr.
+    StringSignal emit: ('Loaded module: {1}' format: { module moduleName })
 ]
 
 { #category : 'modules' }
@@ -285,6 +285,9 @@ BlennyWebApp >> startServer [
 	BlennyConfig reset.
 	BlennyPublisher reset.
 	
+	"Start logging"
+   BlennyFileLogger attachToBeacon.
+	
 	ZnServer allInstancesDo: [ :s | s port = port ifTrue: [ s stop ] ].
 
 	bindAddress := BlennyConfig current bindAddress.
@@ -345,18 +348,8 @@ BlennyWebApp >> startServer [
 	server delegate: router.
 	server start.
 
-	Transcript
-		show: '========================================';
-		cr;
-		show: 'Blenny server started on port ' , port asString;
-		cr;
-		show: 'SSE endpoint: http://localhost:' , port asString , '/sse';
-		cr;
-		show:
-			'WebSocket (optional): enable via #enableWebSocketsWithDefaultIntents:';
-		cr;
-		show: '========================================';
-		cr
+		StringSignal emit: ('Server started on port {1}. SSE: http://localhost:{1}/sse. WebSocket optional.' format: { port }).
+	
 ]
 
 { #category : 'server' }
@@ -382,9 +375,7 @@ BlennyWebApp >> stop [
 	BlennyConfig reset.
 	BlennyPublisher reset.
 
-	Transcript
-		show: 'Blenny server stopped.';
-		cr
+	StringSignal emit: 'Blenny server stopped.'
 ]
 
 { #category : 'modules' }

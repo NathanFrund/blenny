@@ -53,16 +53,18 @@ DashboardModule >> authProvider: anObject [
 
 { #category : 'handling' }
 DashboardModule >> handleDashboard: request [
-    | user |
-    user := self authenticatedUserFrom: request.
 
-	Transcript show: 'Dashboard user: '; show: user; cr.
+	| user |
+	user := self authenticatedUserFrom: request.
 
-    user ifNil: [ ^ ZnResponse redirect: '/login' ].
+	StringSignal emit: ('Dashboard user: {1}' format: { user }).
 
-    ^ self renderPage: 'dashboard' 
-           context: { 'username' -> user } asDictionary 
-           request: request
+	user ifNil: [ ^ ZnResponse redirect: '/login' ].
+
+	^ self
+		  renderPage: 'dashboard'
+		  context: { ('username' -> user) } asDictionary
+		  request: request
 ]
 
 { #category : 'handling' }

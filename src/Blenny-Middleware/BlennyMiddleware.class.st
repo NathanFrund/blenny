@@ -46,21 +46,19 @@ BlennyMiddleware class >> currentUserFrom: request using: authProvider [
 { #category : 'private' }
 BlennyMiddleware class >> extractTokenFromCookie: request [
     | cookieHeader |
-    Transcript show: '=== ENTERED extractTokenFromCookie ==='; cr.
+    StringSignal emit: 'extractTokenFromCookie called'.
     
     cookieHeader := request headers at: 'Cookie' ifAbsent: [ 
-        Transcript show: 'No Cookie header found'; cr.
+        StringSignal emit: 'No Cookie header found'.
         ^ nil ].
     
-    "Manual parsing"
     (cookieHeader splitOn: '; ') do: [ :pair |
         | key value |
         key := (pair copyUpTo: $=) trimBoth.
         value := (pair copyAfter: $=) trimBoth.
-        key = 'session' ifTrue: [ 
-            ^ value ] ].
+        key = 'session' ifTrue: [ ^ value ] ].
     
-    Transcript show: 'No session cookie found'; cr.
+    StringSignal emit: 'No session cookie found'.
     ^ nil
 ]
 
@@ -72,9 +70,9 @@ BlennyMiddleware class >> logRequests [
         
         "Ensure it's a response before calling statusLine"
         (response isKindOf: ZnResponse) ifTrue: [
-             Transcript show: '← ', response statusLine code asString; cr.
+             StringSignal emit: ('← {1}' format: { response statusLine code asString }).
         ] ifFalse: [
-             Transcript show: '← [Non-Response Returned]'; cr.
+             StringSignal emit: '← [Non-Response Returned]'.
         ].
         
         response ]
@@ -82,14 +80,18 @@ BlennyMiddleware class >> logRequests [
 
 { #category : 'logging' }
 BlennyMiddleware class >> logSlowRequests: thresholdSeconds [
-    ^ [ :handler :request |
-        | start response duration |
-        start := DateAndTime now.
-        response := handler value: request.
-        duration := (DateAndTime now - start) asSeconds.
-        duration > thresholdSeconds ifTrue: [
-            Transcript show: 'SLOW: ', request method, ' ', request uri path, ' - ', duration asString, 's'; cr ].
-        response ]
+
+	^ [ :handler :request |
+		  | start response duration |
+		  start := DateAndTime now.
+		  response := handler value: request.
+		  duration := (DateAndTime now - start) asSeconds.
+		  duration > thresholdSeconds ifTrue: [
+				  StringSignal emit: ('SLOW: {1} {2} - {3}s' format: {
+							   request method.
+							   request uri path.
+							   duration asString }) ].
+		  response ]
 ]
 
 { #category : 'rate-limiting' }
@@ -118,7 +120,7 @@ BlennyMiddleware class >> recover [
             on: Error
             do: [ :ex |
                 "This ensures we don't recurse if the Transcript itself fails"
-                [ Transcript show: 'ERROR: ', ex description; cr ] on: Error do: [ ].
+                StringSignal emit: ('ERROR: {1}' format: { ex description }).
                 ZnResponse serverError: 'Internal Server Error' ] ]
 
 ]
@@ -129,7 +131,7 @@ BlennyMiddleware class >> recoverSilent [
         [ handler value: request ]
             on: Error
             do: [ :ex |
-                Transcript show: 'FATAL ERROR: ', ex description; cr.
+                StringSignal emit: ('FATAL ERROR: {1}' format: { ex description }).
                 (ZnResponse statusCode: 500)
                     entity: (ZnEntity text: 'Internal Server Error');
                     yourself ] ]

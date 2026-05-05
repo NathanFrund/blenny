@@ -48,9 +48,10 @@ BlennyMemoryRepository >> cleanupExpiredBlacklist [
 
 { #category : 'initialization' }
 BlennyMemoryRepository >> initialize [
-    super initialize.
-    storage := Dictionary new.
-	Transcript show: 'BlennyMemoryRepository initialized with storage'; cr.
+
+	super initialize.
+	storage := Dictionary new.
+	StringSignal emit: 'BlennyMemoryRepository initialized with storage'
 ]
 
 { #category : 'core' }

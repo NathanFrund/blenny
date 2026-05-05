@@ -131,7 +131,7 @@ BlennySimpleAuth >> logout: aToken [
     
     jti ifNotNil: [ 
         repository saveBlacklistEntry: jti expiration: exp.
-        Transcript show: 'Token blacklisted until: ', exp asString; cr ].
+        StringSignal emit: ('Token blacklisted until: {1}' format: { exp asString }). ].
 ]
 
 { #category : 'accessing' }
@@ -176,7 +176,7 @@ BlennySimpleAuth >> startBlacklistJanitor [
         [ true ] whileTrue: [
             (Delay forMinutes: 5) wait.
             self cleanupBlacklist.  "← This is correct"
-            Transcript show: 'Blacklist cleanup complete.'; cr.
+            StringSignal emit: 'Blacklist cleanup complete.'.
         ]
     ] forkAt: Processor userBackgroundPriority named: 'BlennyAuthJanitor'.
 ]
@@ -216,7 +216,7 @@ BlennySimpleAuth >> validateJwt: aToken [
         result := jws payload sub.
         ^ result
     ] on: Error do: [ :ex | 
-        Transcript show: 'JWT Error: ', ex description; cr.
+        StringSignal emit: ('JWT validation error: {1}' format: { ex description }).
         ^ nil ]
 ]
 

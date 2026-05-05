@@ -139,9 +139,5 @@ BlennyConfig >> sessionDuration [
 { #category : 'initialization' }
 BlennyConfig >> showStartupWarning [
     (provider isKindOf: BlennyEmbeddedConfigProvider) ifTrue: [
-        Transcript show: '========================================'; cr.
-        Transcript show: 'WARNING: Using embedded default configuration!'; cr.
-        Transcript show: 'Create blenny.json for production use.'; cr.
-        Transcript show: '========================================'; cr.
-        (Delay forSeconds: 2) wait ]
+        StringSignal emit: 'WARNING: Using embedded default configuration. Create blenny.json for production use.' ]
 ]

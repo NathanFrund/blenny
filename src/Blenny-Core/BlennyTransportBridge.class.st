@@ -27,23 +27,23 @@ Class {
 
 { #category : 'adding' }
 BlennyTransportBridge >> addConnection: aConnection forUser: aUserId intents: aCollection [
-   | connId userConns info |
-   connId := aConnection hash.
-   info := Dictionary new
-      at: #connection put: aConnection;
-      at: #intents put: aCollection asSet;
-      yourself.
-   connectionsById at: connId put: info.
-   userConns := connectionsByUserId at: aUserId ifAbsentPut: [ OrderedCollection new ].
-   userConns add: aConnection.
-   Transcript
-    show: transportName;
-    show: ' CONNECTED (';
-    show: (aCollection asArray join: ',');
-    show: '): ';
-    show: aUserId;
-    cr.
-   ^ aConnection
+
+	| connId userConns info |
+	connId := aConnection hash.
+	info := Dictionary new
+		        at: #connection put: aConnection;
+		        at: #intents put: aCollection asSet;
+		        yourself.
+	connectionsById at: connId put: info.
+	userConns := connectionsByUserId
+		             at: aUserId
+		             ifAbsentPut: [ OrderedCollection new ].
+	userConns add: aConnection.
+	StringSignal emit: ('{1} CONNECTED ({2}): {3}' format: {
+				 transportName.
+				 (aCollection asArray join: ',').
+				 aUserId }).
+	^ aConnection
 ]
 
 { #category : 'adding' }
@@ -166,7 +166,7 @@ BlennyTransportBridge >> removeConnection: aConnection forUser: aUserId [
    userConns := connectionsByUserId at: aUserId ifAbsent: [ ^ self ].
    userConns remove: aConnection ifAbsent: [].
    userConns ifEmpty: [ connectionsByUserId removeKey: aUserId ].
-   Transcript show: transportName; show: ' DISCONNECTED: '; show: aUserId; cr.
+   StringSignal emit: ('{1} DISCONNECTED: {2}' format: { transportName. aUserId }).
 
 ]
 
@@ -192,23 +192,20 @@ BlennyTransportBridge >> start [
 
 { #category : 'accessing' }
 BlennyTransportBridge >> stop [
-   isRunning := false.
-   announcer unsubscribe: self.
-   connectionsById copy valuesDo: [ :info |
-      [ (info at: #connection) close ]
-         on: Error do: [ :ex |
-            Transcript
-               show: transportName;
-               show: ' failed to close: ';
-               show: ex messageText;
-               cr ] ].
-   connectionsById removeAll.
-   connectionsByUserId removeAll.
-   Transcript
-      show: transportName;
-      show: ' bridge stopped';
-      cr.
-   ^ self
+
+	isRunning := false.
+	announcer unsubscribe: self.
+	connectionsById copy valuesDo: [ :info |
+			[ (info at: #connection) close ]
+				on: Error
+				do: [ :ex |
+						StringSignal emit: ('{1} failed to close: {2}' format: {
+									 transportName.
+									 ex messageText }) ] ].
+	connectionsById removeAll.
+	connectionsByUserId removeAll.
+	StringSignal emit: ('{1} bridge stopped' format: { transportName }).
+	^ self
 ]
 
 { #category : 'accessing' }
