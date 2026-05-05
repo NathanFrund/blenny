@@ -38,15 +38,25 @@ Class {
 	#package : 'Blenny-Core'
 }
 
+{ #category : 'accessing' }
+BlennyWebApp class >> default [
+   "Answer the most recently started BlennyWebApp, or nil if none is running."
+   | apps |
+   apps := self allInstances select: [ :each | each server notNil and: [ each server isRunning ] ].
+   ^ apps ifNotEmpty: [ apps last ] ifEmpty: [ nil ]
+]
+
 { #category : 'server' }
 BlennyWebApp >> announceStarted [
-    | mode |
-    mode := rootPath ifNil: [ 'frozen' ] ifNotNil: [ 'disk' ].
-    Transcript 
-        nextPutAll: 'Blenny server started on port ';
-        nextPutAll: port asString;
-        nextPutAll: ' (', mode, ' mode)';
-        cr.
+   | mode |
+   mode := rootPath ifNil: [ 'frozen' ] ifNotNil: [ 'disk' ].
+   Transcript
+      show: 'Blenny server started on port ';
+      show: port asString;
+      show: ' (';
+      show: mode;
+      show: ' mode)';
+      cr.
 ]
 
 { #category : 'accessing' }
@@ -61,8 +71,13 @@ BlennyWebApp >> broadcast: aMessage toUser: aUserId [
    allTransports do: [ :transport |
       (transport hasConnectionForUser: aUserId) ifTrue: [
          [ transport directMessage: aMessage to: aUserId ]
-            on: Error do: [ :e | Transcript show: transport transportName, ' failed: ', e messageText ]
-      ] ]
+            on: Error do: [ :e |
+               Transcript
+                  show: transport transportName;
+                  show: ' failed: ';
+                  show: e messageText;
+                  cr ] ] ].
+   ^ self
 ]
 
 { #category : 'publishing' }
@@ -79,8 +94,13 @@ BlennyWebApp >> broadcastHtml: aString [
 BlennyWebApp >> broadcastMessage: aMessage [
    { sseBridge }, optionalTransports do: [ :transport |
       [ transport broadcastMessage: aMessage ]
-         on: Error do: [ :e | Transcript show: transport transportName, ' broadcast failed: ', e messageText ]
-   ]
+         on: Error do: [ :e |
+            Transcript
+               show: transport transportName;
+               show: ' broadcast failed: ';
+               show: e messageText;
+               cr ] ].
+   ^ self
 ]
 
 { #category : 'accessing' }
@@ -129,7 +149,7 @@ BlennyWebApp >> discoverModules [
     ^ TBlennyModule users
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'server' }
 BlennyWebApp >> enableWebSocketsWithDefaultIntents: intents [
     | htmlBridge dataBridge |
     "HTML endpoint – sends raw HTML (no JSON wrapper)"
@@ -370,10 +390,8 @@ BlennyWebApp >> stopModules [
     modules do: [ :module | module stopModule ]
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'accessing' }
 BlennyWebApp >> transportNamed: aString [
-   ^ (self sseBridge transportName = aString
-      ifTrue: [ self sseBridge ]
-      ifFalse: [ nil ])
-      ifNil: [ optionalTransports detect: [ :each | each transportName = aString ] ifNone: [ nil ] ]
+   self sseBridge transportName = aString ifTrue: [ ^ self sseBridge ].
+   ^ optionalTransports detect: [ :each | each transportName = aString ] ifNone: [ nil ]
 ]

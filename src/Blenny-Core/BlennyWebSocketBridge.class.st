@@ -41,15 +41,25 @@ BlennyWebSocketBridge >> handleWebSocket: aWebSocket forUser: aUserId intents: a
    self addConnection: aWebSocket forUser: aUserId intents: aCollection.
    
    Transcript
-      show: transportName, ' CONNECTED (', aCollection asCommaString, '): ', aUserId;
+      show: transportName;
+      show: ' CONNECTED (';
+      show: (aCollection asArray join: ',');
+      show: '): ';
+      show: aUserId;
       cr.
    
    [ 
       [ aWebSocket runWith: [ :msg |
-         Transcript show: aUserId, ' [', transportName, ']: ', msg asString; cr.
+         Transcript
+            show: aUserId;
+            show: ' [';
+            show: transportName;
+            show: ']: ';
+            show: msg asString;
+            cr.
          aWebSocket sendMessage: 'Echo: ', msg asString ] ]
-         on: ConnectionClosed
-         do: [ :ex | ]
+         on: ConnectionClosed do: [ :ex |
+            Transcript show: 'WebSocket disconnected: ', aUserId; cr ]
    ] ensure: [
       self removeConnection: aWebSocket forUser: aUserId ]
 ]

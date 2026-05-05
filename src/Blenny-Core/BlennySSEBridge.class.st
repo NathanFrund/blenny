@@ -45,6 +45,9 @@ BlennySSEBridge >> initializeWithEncoder: anSSEEncoder name: aString [
 BlennySSEBridge >> sendMessage: aMessage to: aConnection [
    | rawSSE |
    rawSSE := encoder encodeMessage: aMessage.
-   rawSSE ifNotNil: [ [ aConnection nextPutAll: rawSSE; flush ] on: Error do: [] ]
+   rawSSE ifNotNil: [
+      [ aConnection nextPutAll: rawSSE; flush ]
+         on: Error do: [ :e |
+            Transcript show: 'SSE send error: '; show: e messageText; cr ] ]
 
 ]

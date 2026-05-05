@@ -36,7 +36,13 @@ BlennyTransportBridge >> addConnection: aConnection forUser: aUserId intents: aC
    connectionsById at: connId put: info.
    userConns := connectionsByUserId at: aUserId ifAbsentPut: [ OrderedCollection new ].
    userConns add: aConnection.
-   Transcript show: transportName, ' CONNECTED (', aCollection asCommaString, '): ', aUserId; cr.
+   Transcript
+    show: transportName;
+    show: ' CONNECTED (';
+    show: (aCollection asArray join: ',');
+    show: '): ';
+    show: aUserId;
+    cr.
    ^ aConnection
 ]
 
@@ -160,7 +166,7 @@ BlennyTransportBridge >> removeConnection: aConnection forUser: aUserId [
    userConns := connectionsByUserId at: aUserId ifAbsent: [ ^ self ].
    userConns remove: aConnection ifAbsent: [].
    userConns ifEmpty: [ connectionsByUserId removeKey: aUserId ].
-   Transcript show: transportName, ' DISCONNECTED: ', aUserId; cr.
+   Transcript show: transportName; show: ' DISCONNECTED: '; show: aUserId; cr.
 
 ]
 
@@ -188,10 +194,21 @@ BlennyTransportBridge >> start [
 BlennyTransportBridge >> stop [
    isRunning := false.
    announcer unsubscribe: self.
-   connectionsById copy valuesDo: [ :info | [ (info at: #connection) close ] on: Error do: [] ].
+   connectionsById copy valuesDo: [ :info |
+      [ (info at: #connection) close ]
+         on: Error do: [ :ex |
+            Transcript
+               show: transportName;
+               show: ' failed to close: ';
+               show: ex messageText;
+               cr ] ].
    connectionsById removeAll.
    connectionsByUserId removeAll.
-   Transcript show: transportName, ' bridge stopped'; cr.
+   Transcript
+      show: transportName;
+      show: ' bridge stopped';
+      cr.
+   ^ self
 ]
 
 { #category : 'accessing' }

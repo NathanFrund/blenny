@@ -270,7 +270,7 @@ BlennyRouter >> runSSEStream: socketStream forUser: userId withBridge: bridge in
    ].
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'accessing' }
 BlennyRouter >> sseBridge [
    "The always‑present SSE bridge"
    ^ app sseBridge
@@ -282,7 +282,7 @@ BlennyRouter >> use: aMiddleware [
     globalMiddleware add: aMiddleware.
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'accessing' }
 BlennyRouter >> wsBridge [
    "The optional WebSocket sidecar, if enabled"
    ^ app optionalTransports
