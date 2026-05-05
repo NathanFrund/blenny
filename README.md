@@ -110,6 +110,19 @@ BlennyPublisher broadcastHtml: '<div class="alert">Hello world!</div>'
 BlennyPublisher directHtml: '<div>Private message</div>' toUser: 'alice'
 ```
 
+### Enable WebSockets (optionsl)
+
+```smalltalk
+app enableWebSocketsWithDefaultIntents: #(all).
+```
+
+This creates two endpoints:
+
+* `/ws/html` - sends raw HTML (HTMX-ready)
+* `/ws/data` - sends the full message dictionary as JSON
+
+Clients connect exactly like they would in Blenny's previous WebSocket-only era, but now WebSockets are entirely opt-in. Without the call above, `/ws/*` returns a 404.
+
 ### Create a module
 
 ```smalltalk
@@ -150,22 +163,24 @@ The core framework remains completely independent of Datastar – it’s a first
 
 ## Configuration
 
-Create `blenny.json` in your working directory:
+Create `blenny.json` in your working directory. The file only needs to contain the values you want to override; everything else falls back to the embedded defaults.
 
 ```json
 {
-  "server.port": 8081,
-  "server.bind_address": "0.0.0.0",
-  "auth.jwt_secret": "your-secret-key",
-  "auth.session_duration_hours": 720,
-  "dev_mode": true,
-  "sse.encoder": "BlennyStandardSSEEncoder"
+  "server.port": "8080"
 }
 ```
 
-> **Important:** The current config system selects the first available provider.
-> If a `blenny.json` file exists, all keys must be present – it will not fall back to embedded defaults.
-> A composite provider that merges multiple sources is planned for a future release.
+The configuration system now uses a **composite provider** that automatically merges sources in this order:
+
+1. Command line arguments
+2. Environment variables
+3. `blenny.json`
+4. Embedded defaults
+
+A key missing from a higher-priority source automatically falls through to the next one.
+
+No more duplication.
 
 ## Documentation
 
