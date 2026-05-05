@@ -37,6 +37,13 @@ BlennyConfigProvider >> at: aKey [
 ]
 
 { #category : 'accessing' }
+BlennyConfigProvider >> at: aKey ifAbsent: aBlock [
+   | value |
+   value := self at: aKey.
+   ^ value ifNil: aBlock
+]
+
+{ #category : 'accessing' }
 BlennyConfigProvider >> booleanAt: aKey [
     | value |
     value := self at: aKey.

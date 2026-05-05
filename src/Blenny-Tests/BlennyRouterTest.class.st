@@ -13,20 +13,29 @@ Class {
 
 { #category : 'running' }
 BlennyRouterTest >> setUp [
-    authProvider := BlennySimpleAuth new.
-    renderer := BlennyRenderer new.
-    loginHandler := BlennyLoginHandler new
-        initializeWithAuth: authProvider renderer: renderer.
-    
-    router := BlennyRouter new initializeWith: {
-        'renderer' -> renderer.
-        'loginHandler' -> loginHandler.
-        'registerHandler' -> nil.
-        'logoutHandler' -> nil.
-        'htmlBridge' -> nil.
-        'dataBridge' -> nil.
-        'rootPath' -> nil.
-    } asDictionary.
+
+	| app |
+	authProvider := BlennySimpleAuth new.
+	"Ensure auth provider has a repository with at least one user (for any token‑based tests)"
+	authProvider repository: BlennyMemoryRepository new.
+
+	renderer := BlennyRenderer new.
+	loginHandler := BlennyLoginHandler new
+		                initializeWithAuth: authProvider
+		                renderer: renderer.
+
+	"Create a lightweight BlennyWebApp that provides the SSE bridge"
+	app := BlennyWebApp new.
+	app instVarNamed: 'sseBridge' put: nil. "no SSE bridge needed for these route tests"
+	app instVarNamed: 'optionalTransports' put: OrderedCollection new.
+
+	router := BlennyRouter new initializeWith: {
+			          ('renderer' -> renderer).
+			          ('loginHandler' -> loginHandler).
+			          ('registerHandler' -> nil).
+			          ('logoutHandler' -> nil).
+			          ('app' -> app).
+			          ('rootPath' -> nil) } asDictionary
 ]
 
 { #category : 'tests' }

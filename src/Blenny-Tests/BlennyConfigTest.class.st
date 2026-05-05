@@ -14,6 +14,22 @@ BlennyConfigTest >> testBooleanAt [
 ]
 
 { #category : 'tests' }
+BlennyConfigTest >> testCompositeFallback [
+   | composite fileProvider embedded |
+   "Arrange"
+   fileProvider := BlennyFileConfigProvider new.
+   fileProvider filePath: 'this-file-does-not-exist.json'.
+   embedded := BlennyEmbeddedConfigProvider new.
+   composite := BlennyCompositeConfigProvider new.
+   composite addProvider: fileProvider.
+   composite addProvider: embedded.
+   
+   "Assert: values from file provider (missing) fall back to embedded"
+   self assert: (composite at: 'server.port') equals: 8081.
+   self assert: (composite at: 'sse.encoder' ifAbsent: [ nil ]) equals: 'BlennyStandardSSEEncoder'.
+]
+
+{ #category : 'tests' }
 BlennyConfigTest >> testConvenienceMethods [
     | config |
     config := BlennyConfig new.
@@ -37,10 +53,11 @@ BlennyConfigTest >> testDefaultValues [
 
 { #category : 'tests' }
 BlennyConfigTest >> testFileProviderWithMissingFile [
-    | provider |
-    provider := BlennyFileConfigProvider new.
-    "Should return false without error"
-    self assert: provider hasConfig equals: false.
+
+	| provider |
+	provider := BlennyFileConfigProvider new.
+	provider filePath: 'this-file-does-not-exist.json'. "always missing"
+	self assert: provider hasConfig equals: false
 ]
 
 { #category : 'tests' }

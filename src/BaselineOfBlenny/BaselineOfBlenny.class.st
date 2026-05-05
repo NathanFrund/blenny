@@ -57,7 +57,10 @@ BaselineOfBlenny >> baseline: spec [
             with: [ spec requires: #( 'Blenny-Core' 'Blenny-Persistence' ) ];
 
 				package: 'Blenny-Datastar'
-            with: [ spec requires: #( 'Blenny-Core' 'DatastarSDK' ) ].
+            with: [ spec requires: #( 'Blenny-Core' 'DatastarSDK' ) ];
+
+				package: 'Blenny-Tests'
+    			with: [ spec requires: #( 'Blenny-Core' 'Blenny-Auth' 'Blenny-Announcements' ) ].
 
         "Groups"
         spec
@@ -68,5 +71,6 @@ BaselineOfBlenny >> baseline: spec [
             group: 'Core'
             with: #( 'Blenny-Traits' 'Blenny-Core' 'Blenny-Config' 'Blenny-Persistence' );
             group: 'PostgreSQL' with: #( 'Blenny-Persistence' ) ];
+				group: 'Tests' with: #( 'Blenny-Tests' );
 				group: 'Datastar' with: #( 'Blenny-Datastar' ).
 ]

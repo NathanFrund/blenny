@@ -23,7 +23,8 @@ Class {
 	#name : 'BlennyFileConfigProvider',
 	#superclass : 'BlennyConfigProvider',
 	#instVars : [
-		'config'
+		'config',
+		'filePath'
 	],
 	#category : 'Blenny-Config',
 	#package : 'Blenny-Config'
@@ -31,7 +32,14 @@ Class {
 
 { #category : 'accessing' }
 BlennyFileConfigProvider >> at: aKey [
-    ^ config at: aKey ifAbsent: [ nil ]
+   config ifNil: [ ^ nil ].
+   ^ config at: aKey ifAbsent: [ nil ].
+]
+
+{ #category : 'accessing' }
+BlennyFileConfigProvider >> filePath: aStringOrFileReference [
+   filePath := aStringOrFileReference.
+   self loadConfig.
 ]
 
 { #category : 'testing' }
@@ -47,8 +55,12 @@ BlennyFileConfigProvider >> initialize [
 
 { #category : 'loading' }
 BlennyFileConfigProvider >> loadConfig [
-    | file |
-    file := 'blenny.json' asFileReference.
-    file exists ifFalse: [ ^ self ].
-    config := STON fromString: file contents.
+   | file |
+   file := filePath
+      ifNotNil: [ filePath asFileReference ]
+      ifNil: [ 'blenny.json' asFileReference ].
+   file exists ifFalse: [
+      config := nil.
+      ^ self ].
+   config := STON fromString: file contents.
 ]

@@ -120,11 +120,13 @@ BlennyConfig >> resetProvider [
 
 { #category : 'initialization' }
 BlennyConfig >> selectProvider [
-    "Try providers in order of precedence"
-    (BlennyArgConfigProvider new hasConfig) ifTrue: [ ^ BlennyArgConfigProvider new ].
-    (BlennyEnvConfigProvider new hasConfig) ifTrue: [ ^ BlennyEnvConfigProvider new ].
-    (BlennyFileConfigProvider new hasConfig) ifTrue: [ ^ BlennyFileConfigProvider new ].
-    ^ BlennyEmbeddedConfigProvider new.
+   | composite |
+   composite := BlennyCompositeConfigProvider new.
+   (BlennyArgConfigProvider new hasConfig) ifTrue: [ composite addProvider: BlennyArgConfigProvider new ].
+   (BlennyEnvConfigProvider new hasConfig) ifTrue: [ composite addProvider: BlennyEnvConfigProvider new ].
+   (BlennyFileConfigProvider new hasConfig) ifTrue: [ composite addProvider: BlennyFileConfigProvider new ].
+   composite addProvider: BlennyEmbeddedConfigProvider new.   "always final fallback"
+   ^ composite.
 ]
 
 { #category : 'convenience' }

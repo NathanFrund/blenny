@@ -7,10 +7,10 @@ Class {
 
 { #category : 'tests' }
 BlennyPublisherTest >> testNoRunningApp [
-    "Reset the cached app"
-    BlennyPublisher reset.
-    "Without running app, currentWebApp should error"
-    self should: [ BlennyPublisher currentWebApp ] raise: Error.
+   "Ensure no running app is present, then verify that currentWebApp raises an error"
+   BlennyWebApp allInstances do: [ :app | app stop ].
+   BlennyPublisher reset.
+   self should: [ BlennyPublisher currentWebApp ] raise: Error.
 
 ]
 

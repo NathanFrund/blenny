@@ -141,6 +141,11 @@ BlennyTransportBridge >> intentsForConnection: aConnection [
    ^ info at: #intents
 ]
 
+{ #category : 'accessing' }
+BlennyTransportBridge >> isRunning [
+   ^ isRunning
+]
+
 { #category : 'publishing' }
 BlennyTransportBridge >> publish: anAnnouncement [
    isRunning ifFalse: [ ^ self ].
