@@ -6,51 +6,65 @@
 
 **Bringing the legendary live-coding productivity of Pharo to the modern, real-time web.**
 
-Blenny is a real-time web framework for Pharo that combines WebSockets, HTMX, JWT authentication, and a modular architecture. Build reactive applications with minimal effort and maximum reliability.
+Blenny is a real-time web framework for Pharo that combines **Server‑Sent Events**, optional WebSockets, HTMX, JWT authentication, and a modular architecture. 
+
+Build reactive applications with minimal effort and maximum reliability.
 
 ## Features
 
-- **Real-time by default** - WebSocket support for HTML and JSON endpoints
-- **HTMX integration** - Build interactive UIs without writing JavaScript
-- **JWT authentication** - Stateless, secure, configurable sessions
-- **Pluggable modules** - Auto-discovered, zero-configuration modules
-- **Multi-layer config** - Embedded defaults, file, env, and command line
-- **Anti-Fragile Middleware** - Strict response contract prevents server-side crashes from mismatched return types (Strings vs. Objects)
-- **Template rendering** - Mustache templates with hot reload (Conduit)
-- **BlennyPublisher** - Any Pharo object can push real-time updates with one line of code
+- **SSE‑first by default** – resilient, auto‑reconnecting, browser‑native push with zero custom JavaScript
+- **Pluggable transport encoders** – plain SSE for HTMX / vanilla, or Datastar for hypermedia gloss
+- **Optional WebSockets** – enable bidirectional channels when you need them
+- **HTMX integration** – build interactive UIs without writing JavaScript
+- **JWT authentication** – stateless, secure, configurable sessions
+- **Pluggable modules** – auto‑discovered, zero‑configuration modules
+- **Multi‑layer config** – embedded defaults, file (blenny.json), env, and command line
+- **Anti‑Fragile Middleware** – strict response contract prevents server‑side crashes
+- **Template rendering** – Mustache templates with hot reload (Conduit)
+- **BlennyPublisher** – any Pharo object can push real‑time updates with one line of code
 
 ## The Blenny Philosophy
 
-Blenny is designed so that **business logic doesn't need to know about the transport layer**. Whether you're responding to an HTTP GET, an HTMX fragment request, or pushing a real-time update over WebSocket, the code remains the same.
+Blenny is designed so that **business logic doesn't need to know about the transport layer**. 
+
+Whether you're responding to an HTTP GET, an HTMX fragment request, or pushing a real-time update over WebSocket, the code remains the same.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      Browser (HTMX/WebSocket)               │
+│                  Browser (HTMX / Datastar)                  │
+│                 SSE connection always active                │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      Middleware Pipeline                    │
+│                     Middleware Pipeline                     │
 │         (Logging → Auth → Security → Rate Limiting)         │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                         BlennyRouter                        │
-│              (Routes → Module Dispatcher → 404)             │
+│                        BlennyRouter                         │
+│      (Routes → SSE handler → Module Dispatcher → 404)       │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    BlennyTransportBridge                    │
+│         (BlennySSEBridge / BlennyWebSocketBridge)           │
+│            Encoder strategy plugs in at runtime             │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    TBlennyModule (Trait)                    │
-│         (Auth helper, ZnResponse wrapping, HTMX)            │
+│          (Auth helper, ZnResponse wrapping, HTMX)           │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      Your Module Handler                    │
+│                     Your Module Handler                     │
 │                    (Pure business logic)                    │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -67,6 +81,20 @@ Metacello new
     onUpgrade: [ :ex | ex useIncoming ];
     load.
 ```
+### Loading the Datastar Plugin (optional)
+
+If you want the richer hypermedia events (`datastar-patch-elements`, `datastar-merge-signals`), include the `Datastar` group when installing Blenny:
+
+```smalltalk
+Metacello new
+    baseline: 'Blenny';
+    repository: 'github://NathanFrund/Blenny:main/src';
+    onConflict: [ :ex | ex useIncoming ];
+    onUpgrade: [ :ex | ex useIncoming ];
+    load: 'Datastar'.
+```
+
+Make sure you set `sse.encoder` as outlined below.   
 
 ### Start a server
 
@@ -105,6 +133,21 @@ DashboardModule >> handleDashboard: request
         request: request
 ```
 
+## SSE and Encoders
+Blenny ships with a **brand‑neutral standard encoder** that produces plain SSE (event: message), compatible with HTMX and vanilla EventSource.
+
+To switch to **Datastar** (rich hypermedia events), set the sse.encoder key in your blenny.json:
+
+```json
+{
+  "sse.encoder": "DatastarSSEEncoder"
+}
+```
+
+The Datastar‑Pharo‑SDK is loaded automatically when you include the `Blenny-Datastar` package or the `Datastar` group in your Metacello load.
+
+The core framework remains completely independent of Datastar – it’s a first‑class opt‑in.
+
 ## Configuration
 
 Create `blenny.json` in your working directory:
@@ -115,9 +158,14 @@ Create `blenny.json` in your working directory:
   "server.bind_address": "0.0.0.0",
   "auth.jwt_secret": "your-secret-key",
   "auth.session_duration_hours": 720,
-  "dev_mode": true
+  "dev_mode": true,
+  "sse.encoder": "BlennyStandardSSEEncoder"
 }
 ```
+
+> **Important:** The current config system selects the first available provider.
+> If a `blenny.json` file exists, all keys must be present – it will not fall back to embedded defaults.
+> A composite provider that merges multiple sources is planned for a future release.
 
 ## Documentation
 
@@ -134,6 +182,7 @@ Create `blenny.json` in your working directory:
   - Zinc HTTP Components
   - JSONWebToken (for JWT support)
   - Conduit (for template rendering)
+  - Datastar-Pharo-SDK (optional, for Datastar encoder)
 
 ## Why Pharo?
 
@@ -166,7 +215,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-```
-
-```
