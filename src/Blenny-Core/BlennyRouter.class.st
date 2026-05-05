@@ -182,7 +182,7 @@ BlennyRouter >> handleWebSocket: request [
       ifFalse: [ ^ ZnResponse badRequest: request ].
 
    "Retrieve the optional WebSocket bridge"
-   bridge := self wsBridge.
+    bridge := app transportNamed: 'ws-', wsType.
    bridge ifNil: [ ^ ZnResponse notFound: 'WebSocket not enabled' ].
 
    "Parse intents, default to #all for backward compatibility"

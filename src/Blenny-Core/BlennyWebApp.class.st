@@ -129,6 +129,25 @@ BlennyWebApp >> discoverModules [
     ^ TBlennyModule users
 ]
 
+{ #category : 'as yet unclassified' }
+BlennyWebApp >> enableWebSocketsWithDefaultIntents: intents [
+    | htmlBridge dataBridge |
+    "HTML endpoint – sends raw HTML (no JSON wrapper)"
+    htmlBridge := BlennyWebSocketBridge new
+        initializeWithName: 'ws-html';
+        rawPayload: true;
+        start.
+    optionalTransports add: htmlBridge.
+
+    "Data endpoint – sends full message dictionary as JSON"
+    dataBridge := BlennyWebSocketBridge new
+        initializeWithName: 'ws-data';
+        start.  "rawPayload defaults to false → JSON"
+    optionalTransports add: dataBridge.
+    
+    ^ htmlBridge
+]
+
 { #category : 'initialization' }
 BlennyWebApp >> initialize [
 
@@ -349,4 +368,12 @@ BlennyWebApp >> stop [
 { #category : 'modules' }
 BlennyWebApp >> stopModules [
     modules do: [ :module | module stopModule ]
+]
+
+{ #category : 'as yet unclassified' }
+BlennyWebApp >> transportNamed: aString [
+   ^ (self sseBridge transportName = aString
+      ifTrue: [ self sseBridge ]
+      ifFalse: [ nil ])
+      ifNil: [ optionalTransports detect: [ :each | each transportName = aString ] ifNone: [ nil ] ]
 ]

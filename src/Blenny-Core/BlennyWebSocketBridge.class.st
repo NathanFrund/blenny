@@ -28,6 +28,9 @@ I use a dictionary-based client store:
 Class {
 	#name : 'BlennyWebSocketBridge',
 	#superclass : 'BlennyTransportBridge',
+	#instVars : [
+		'rawPayload'
+	],
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
 }
@@ -51,12 +54,22 @@ BlennyWebSocketBridge >> handleWebSocket: aWebSocket forUser: aUserId intents: a
       self removeConnection: aWebSocket forUser: aUserId ]
 ]
 
+{ #category : 'accessing' }
+BlennyWebSocketBridge >> rawPayload [
+   ^ rawPayload
+]
+
+{ #category : 'accessing' }
+BlennyWebSocketBridge >> rawPayload: aBoolean [
+   rawPayload := aBoolean
+]
+
 { #category : 'utilities - objectiveC' }
 BlennyWebSocketBridge >> sendMessage: aMessage to: aConnection [
-   | jsonString |
-   jsonString := (STON writer on: String new)
-      jsonMode: true;
-      nextPut: aMessage;
-      contents.
-   aConnection sendMessage: jsonString
+   rawPayload == true
+      ifTrue: [
+         | payload |
+         payload := aMessage at: #html ifAbsent: [ aMessage at: #signals ifAbsent: [ nil ] ].
+         payload ifNotNil: [ aConnection sendMessage: payload ] ]
+      ifFalse: [ aConnection sendMessage: (NeoJSONWriter toString: aMessage) ]
 ]
