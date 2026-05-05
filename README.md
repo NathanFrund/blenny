@@ -110,7 +110,7 @@ BlennyPublisher broadcastHtml: '<div class="alert">Hello world!</div>'
 BlennyPublisher directHtml: '<div>Private message</div>' toUser: 'alice'
 ```
 
-### Enable WebSockets (optionsl)
+### Enable WebSockets (optional)
 
 ```smalltalk
 app enableWebSocketsWithDefaultIntents: #(all).
@@ -121,7 +121,9 @@ This creates two endpoints:
 * `/ws/html` - sends raw HTML (HTMX-ready)
 * `/ws/data` - sends the full message dictionary as JSON
 
-Clients connect exactly like they would in Blenny's previous WebSocket-only era, but now WebSockets are entirely opt-in. Without the call above, `/ws/*` returns a 404.
+Clients connect exactly like they would in Blenny's previous WebSocket-only era, but now WebSockets are entirely opt-in. 
+
+Without the call above, `/ws/*` returns a 404.
 
 ### Create a module
 
@@ -181,6 +183,10 @@ The configuration system now uses a **composite provider** that automatically me
 A key missing from a higher-priority source automatically falls through to the next one.
 
 No more duplication.
+
+## Logging
+
+Blenny uses **Beacon** for all runtime logging. By default, log entries are written to `logs/blenny-YYYYMMDD.log` in the image directory.
 
 ## Documentation
 
