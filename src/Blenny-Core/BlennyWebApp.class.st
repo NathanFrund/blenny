@@ -283,6 +283,7 @@ BlennyWebApp >> startServer [
 	| bindAddress encoderClass |
 	
 	BlennyConfig reset.
+	BlennyPublisher reset.
 	
 	ZnServer allInstancesDo: [ :s | s port = port ifTrue: [ s stop ] ].
 
@@ -377,8 +378,9 @@ BlennyWebApp >> stop [
 	"Stop auth janitor"
 	authProvider shutdown.
 
-	"Reset config so next start sees fresh values (e.g. blenny.json changes)"
+	"Reset so next start sees fresh values"
 	BlennyConfig reset.
+	BlennyPublisher reset.
 
 	Transcript
 		show: 'Blenny server stopped.';
