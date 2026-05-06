@@ -227,13 +227,6 @@ BlennyWebApp >> server [
 	^ server
 ]
 
-{ #category : 'middle' }
-BlennyWebApp >> setupDefaultMiddleware [
-    "router use: (BlennyMiddleware recover)."
-    router use: (BlennyMiddleware logRequests).
-    router use: (BlennyMiddleware addSecurityHeaders).
-]
-
 { #category : 'middleware' }
 BlennyWebApp >> setupDefaultMiddlewareOn: aRouter [
     "Apply default middleware to the router"
