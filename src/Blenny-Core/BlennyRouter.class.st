@@ -27,9 +27,6 @@ Class {
 		'rootPath',
 		'renderer',
 		'app',
-		'loginHandler',
-		'logoutHandler',
-		'registerHandler',
 		'routes',
 		'globalMiddleware'
 	],
@@ -100,26 +97,6 @@ BlennyRouter >> handleRequest: request [
    (path = '/' or: [ path isEmpty ]) ifTrue: [
       ^ self ensureResponse: (renderer renderPage: 'index' context: Dictionary new) ].
 
-   "6. Login"
-   (path = '/login' and: [ request method = #GET ]) ifTrue: [
-      ^ self ensureResponse: (loginHandler handleGet: request) ].
-   (path = '/login' and: [ request method = #POST ]) ifTrue: [
-      ^ self ensureResponse: (loginHandler handlePost: request) ].
-
-   "7. Register"
-   (path = '/register' and: [ request method = #GET ]) ifTrue: [
-      ^ self ensureResponse: (registerHandler handleGet: request) ].
-   (path = '/register' and: [ request method = #POST ]) ifTrue: [
-      ^ self ensureResponse: (registerHandler handlePost: request) ].
-
-   "8. Logout"
-   (path = '/logout' and: [ request method = #GET or: [ request method = #POST ] ]) ifTrue: [
-      ^ self ensureResponse: (logoutHandler handlePost: request) ].
-
-(path = '/demo' and: [ request method = #GET ]) ifTrue: [
-    ^ self ensureResponse: (renderer renderPage: 'demo' context: Dictionary new)
-].
-
    "9. 404"
    ^ ZnResponse notFound: path
 ]
@@ -128,8 +105,8 @@ BlennyRouter >> handleRequest: request [
 BlennyRouter >> handleSSE: request [
    | userId intents bridge entity response |
    
-   "Authenticate the SSE request using the standard token extraction + validation"
-   userId := loginHandler authProvider validateToken: (self extractTokenFrom: request).
+   "Ask BlennyWebApp instance to validate the token"
+   userId := app authProvider validateToken: (self extractTokenFrom: request).
    userId ifNil: [ ^ ZnResponse unauthorized: 'Invalid or missing token' ].
    
    intents := self intentsFromRequest: request defaults: #(ui).
@@ -175,7 +152,7 @@ BlennyRouter >> handleWebSocket: request [
    token := self extractTokenFrom: request.
    token ifNil: [ ^ ZnResponse unauthorized: 'Missing token' ].
 
-   userId := loginHandler authProvider validateToken: token.
+   userId := app authProvider validateToken: token.
    userId ifNil: [ ^ ZnResponse unauthorized: 'Invalid token' ].
 
    ((request headers at: 'Upgrade' ifAbsent: [ '' ]) asLowercase includesSubstring: 'websocket')
@@ -196,9 +173,6 @@ BlennyRouter >> handleWebSocket: request [
 { #category : 'initialization' }
 BlennyRouter >> initializeWith: aDictionary [
    renderer := aDictionary at: 'renderer'.
-   loginHandler := aDictionary at: 'loginHandler'.
-   registerHandler := aDictionary at: 'registerHandler'.
-   logoutHandler := aDictionary at: 'logoutHandler'.
    app := aDictionary at: 'app'.               "Reference to the BlennyWebApp"
    rootPath := aDictionary at: 'rootPath' ifAbsent: [ nil ].
    routes := OrderedCollection new.

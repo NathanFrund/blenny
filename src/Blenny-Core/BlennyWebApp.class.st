@@ -146,7 +146,7 @@ BlennyWebApp >> directHtml: aString toUser: aUserId [
 { #category : 'modules' }
 BlennyWebApp >> discoverModules [
     "Find all classes that use TBlennyModule"
-    ^ TBlennyModule users
+    ^ TBlennyModule users select: [ :class | class isEnabled ]
 ]
 
 { #category : 'server' }
@@ -230,7 +230,7 @@ BlennyWebApp >> server [
 { #category : 'middleware' }
 BlennyWebApp >> setupDefaultMiddlewareOn: aRouter [
     "Apply default middleware to the router"
-    aRouter use: (BlennyMiddleware recoverSilent).
+    "aRouter use: (BlennyMiddleware recoverSilent)."
     aRouter use: (BlennyMiddleware logRequests).
     aRouter use: (BlennyMiddleware addSecurityHeaders).
 ]
@@ -301,16 +301,6 @@ BlennyWebApp >> startServer [
 		            initializeWithConduit: conduit
 		            rootPath: rootPath.
 
-	"Create handlers"
-	registerHandler := BlennyRegisterHandler new
-		                   initializeWithAuth: authProvider
-		                   renderer: renderer.
-	loginHandler := BlennyLoginHandler new
-		                initializeWithAuth: authProvider
-		                renderer: renderer.
-	logoutHandler := BlennyLogoutHandler new initializeWithAuth:
-		                 authProvider.
-
 
 	"===== MODULE LOADING ====="
 	self loadModules. "← Discover and instantiate modules"
@@ -320,9 +310,6 @@ BlennyWebApp >> startServer [
 	"Create router with ALL dependencies injected"
 	router := BlennyRouter new initializeWith: {
 			          ('renderer' -> renderer).
-			          ('loginHandler' -> loginHandler).
-			          ('registerHandler' -> registerHandler).
-			          ('logoutHandler' -> logoutHandler).
 			          ('app' -> self). "allows router to fetch bridges on demand"
 			          ('rootPath' -> rootPath) } asDictionary.
 

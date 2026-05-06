@@ -30,7 +30,9 @@ Class {
 	#instVars : [
 		'authProvider',
 		'renderer',
-		'autoLoginAfterRegistration'
+		'autoLoginAfterRegistration',
+		'registerTemplate',
+		'registerErrorTemplate'
 	],
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
@@ -43,11 +45,12 @@ BlennyRegisterHandler >> autoLoginAfterRegistration: aBoolean [
 
 { #category : 'handling' }
 BlennyRegisterHandler >> handleGet: request [
-    | context email |
+    | context email html |
     context := Dictionary new.
     email := request uri queryAt: 'email' ifAbsent: [ nil ].
     email ifNotNil: [ context at: 'email' put: email ].
-    ^ renderer renderPage: 'register' context: context
+    html := renderer renderPage: 'register' context: context.
+    ^ ZnResponse ok: (ZnEntity html: html)
 ]
 
 { #category : 'handling' }
@@ -116,6 +119,16 @@ BlennyRegisterHandler >> redirectWithCookie: sessionId [
     ^ response
 ]
 
+{ #category : 'accessing' }
+BlennyRegisterHandler >> registerErrorTemplate [
+   ^ registerErrorTemplate ifNil: [ 'register_form' ]
+]
+
+{ #category : 'accessing' }
+BlennyRegisterHandler >> registerTemplate [
+   ^ registerTemplate ifNil: [ 'register' ]
+]
+
 { #category : 'private' }
 BlennyRegisterHandler >> renderError: errorMessage request: aRequest [
     | context formData |
@@ -123,5 +136,5 @@ BlennyRegisterHandler >> renderError: errorMessage request: aRequest [
     formData := aRequest entity fields.
     context at: 'error' put: errorMessage.
     context at: 'email' put: (formData at: 'email' ifAbsent: [ '']).
-    ^ renderer render: 'partials/register_form' request: aRequest context: context
+    ^ renderer render: 'register_form' request: aRequest context: context
 ]

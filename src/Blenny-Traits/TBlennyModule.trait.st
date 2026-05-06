@@ -25,6 +25,11 @@ Trait {
 	#package : 'Blenny-Traits'
 }
 
+{ #category : 'testing' }
+TBlennyModule classSide >> isEnabled [
+   ^ true
+]
+
 { #category : 'accessing' }
 TBlennyModule >> authProvider [
     "Subclasses must provide this"
