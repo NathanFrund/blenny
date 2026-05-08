@@ -238,11 +238,11 @@ Blenny uses **Beacon** for all runtime logging. By default, log entries are writ
 
 ## Documentation
 
-- [Authentication](docs/authentication.md) - JWT setup, session duration, blacklist
-- [Modules](docs/modules.md) - Creating modules, routes, publishing
-- [Middleware](docs/middleware.md) - Logging, rate limiting, security headers
-- [WebSockets](docs/websockets.md) - Broadcast, direct messages, HTMX
-- [Configuration](docs/configuration.md) - Multi-layer config system
+- [Authentication](https://github.com/NathanFrund/blenny/wiki/Authentication) - JWT setup, session duration, blacklist
+- [Modules](https://github.com/NathanFrund/blenny/wiki/Modules) - Creating modules, routes, publishing
+- [Middleware](https://github.com/NathanFrund/blenny/wiki/Middleware) - Logging, rate limiting, security headers
+- [WebSockets](https://github.com/NathanFrund/blenny/wiki/WebSockets) - Broadcast, direct messages, HTMX
+- [Configuration](https://github.com/NathanFrund/blenny/wiki/Configuration) - Multi-layer config system
 
 ## Requirements
 
