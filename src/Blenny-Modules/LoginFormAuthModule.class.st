@@ -46,6 +46,12 @@ LoginFormAuthModule >> initializeModule [
       initializeWithAuth: authProvider renderer: renderer.
    logoutHandler := BlennyLogoutHandler new
       initializeWithAuth: authProvider.
+
+	"Tell the handlers exactly where the auth templates live (relative to Conduit root)."
+   loginHandler loginTemplate: 'auth/login'.
+   loginHandler loginErrorTemplate: 'auth/login_form'.
+   registerHandler registerTemplate: 'auth/register'.
+   registerHandler registerErrorTemplate: 'auth/register_form'.
 ]
 
 { #category : 'required' }

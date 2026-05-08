@@ -49,7 +49,7 @@ BlennyRegisterHandler >> handleGet: request [
     context := Dictionary new.
     email := request uri queryAt: 'email' ifAbsent: [ nil ].
     email ifNotNil: [ context at: 'email' put: email ].
-    html := renderer renderPage: 'register' context: context.
+    html := renderer renderPage: self registerTemplate context: context.
     ^ ZnResponse ok: (ZnEntity html: html)
 ]
 
@@ -125,16 +125,27 @@ BlennyRegisterHandler >> registerErrorTemplate [
 ]
 
 { #category : 'accessing' }
+BlennyRegisterHandler >> registerErrorTemplate: aString [
+   registerErrorTemplate := aString
+]
+
+{ #category : 'accessing' }
 BlennyRegisterHandler >> registerTemplate [
-   ^ registerTemplate ifNil: [ 'register' ]
+   ^ registerTemplate ifNil: [ 'login' ]
+]
+
+{ #category : 'accessing' }
+BlennyRegisterHandler >> registerTemplate: aString [
+   registerTemplate := aString
 ]
 
 { #category : 'private' }
 BlennyRegisterHandler >> renderError: errorMessage request: aRequest [
-    | context formData |
+    | context formData html |
     context := Dictionary new.
     formData := aRequest entity fields.
     context at: 'error' put: errorMessage.
     context at: 'email' put: (formData at: 'email' ifAbsent: [ '']).
-    ^ renderer render: 'register_form' request: aRequest context: context
+    html := renderer renderAuto: self registerErrorTemplate request: aRequest context: context.
+    ^ ZnResponse ok: (ZnEntity html: html)
 ]

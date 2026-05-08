@@ -42,8 +42,9 @@ BlennyLoginHandler >> authProvider [
 { #category : 'handling' }
 BlennyLoginHandler >> handleGet: request [
     | html |
-    html := renderer renderPage: 'login' context: Dictionary new.
+    html := renderer renderPage: self loginTemplate context: Dictionary new.
     ^ ZnResponse ok: (ZnEntity html: html)
+
 ]
 
 { #category : 'handling' }
@@ -116,17 +117,12 @@ BlennyLoginHandler >> redirectWithCookie: sessionId [
 
 { #category : 'private' }
 BlennyLoginHandler >> renderError: errorMessage request: aRequest [
-
     | context formData html |
     context := Dictionary new.
-    
-    "Corrected: Access the pre-parsed fields from the entity"
-    formData := aRequest entity fields. 
-    
+    formData := aRequest entity fields.
     context at: 'error' put: errorMessage.
     context at: 'username' put: (formData at: 'username' ifAbsent: [ '' ]).
-    
-    html := renderer render: 'login_form' request: aRequest context: context.
+    html := renderer renderAuto: self loginErrorTemplate request: aRequest context: context.
     ^ ZnResponse ok: (ZnEntity html: html)
 
 ]

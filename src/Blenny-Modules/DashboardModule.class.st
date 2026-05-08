@@ -59,7 +59,7 @@ DashboardModule >> handleDashboard: request [
 
 	StringSignal emit: ('Dashboard user: {1}' format: { user }).
 
-	user ifNil: [ ^ ZnResponse redirect: '/login' ].
+	"user ifNil: [ ^ ZnResponse redirect: '/login' ]."
 
 	^ self
 		  renderPage: 'dashboard'
