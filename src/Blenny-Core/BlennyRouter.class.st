@@ -164,25 +164,33 @@ BlennyRouter >> handleWebSocket: request [
 	intents := self intentsFromRequest: request defaults: #( all ).
 
 	handlerBlock := [ :webSocket |
-		                | handle |
-		                handle := bridge
-			                          registerUser: userId
-			                          stream: webSocket
-			                          intents: intents.
-		                [
-			                [
-				                webSocket runWith: [ :msg | "Handle incoming message"
-						                StringSignal emit:
-							                ('WS received from {1}: {2}' format: {
-									                 userId.
-									                 msg asString }) ] ]
-				                on: ConnectionClosed , SocketError , Error
-				                do: [ :ex | "Normal during shutdown – exit quietly"
-					                StringSignal emit:
-						                ('WS loop exiting: {1}' format:
-							                 { ex messageText }) ] ] ensure: [
-			                handle finalize ] ].
+		| handle |
+		handle := bridge
+			registerUser: userId
+			stream: webSocket
+			intents: intents.
+		[
+			[
+				[
+					webSocket runWith: [ :msg |
+						StringSignal emit: ('WS received from {1}: {2}' format: {
+							userId.
+							msg asString }) ]
+				] on: ConnectionClosed, SocketError do: [ :ex |
+					"Normal drop - exit cleanly"
+				]
+			] on: Error do: [ :ex |
+				"Log legitimate bugs to terminal without popping up UI windows"
+				Stdio stderr nextPutAll: 'WS Unexpected Error: ' , ex description; cr.
+			]
+		] ensure: [
+			"Execute defensively. If an error occurs during termination cleanup, ignore it."
+			[ handle finalize ] on: Exception do: [ :ex | ].
+			[ webSocket close ] on: Exception do: [ :ex | ]
+		]
+	].
 
+	"We use a separate background execution context for the delegate so it doesn't run on the main listener"
 	^ (ZnWebSocketDelegate handler: handlerBlock) handleRequest: request
 ]
 
