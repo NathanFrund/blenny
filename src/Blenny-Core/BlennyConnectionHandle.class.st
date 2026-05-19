@@ -39,14 +39,16 @@ BlennyConnectionHandle >> connectionsByUserId: anObject [
 { #category : 'finalization' }
 BlennyConnectionHandle >> finalize [
     | userDict |
+    "Remove self from the shared per-user dictionary"
     connectionsByUserId ifNotNil: [
         userDict := connectionsByUserId at: userId ifAbsent: [ nil ].
         userDict ifNotNil: [
             userDict removeKey: connectionId ifAbsent: [].
             userDict ifEmpty: [ connectionsByUserId removeKey: userId ] ] ].
+    "Close the stream"
     stream ifNotNil: [
         stream close.
-        stream := nil ]
+        stream := nil ].
 ]
 
 { #category : 'accessing' }

@@ -17,40 +17,12 @@ Class {
 	#instVars : [
 		'announcer',
 		'connectionsByUserId',
-		'connectionsById',
 		'isRunning',
 		'transportName'
 	],
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
 }
-
-{ #category : 'adding' }
-BlennyTransportBridge >> addConnection: aConnection forUser: aUserId intents: aCollection [
-
-	| connId userConns info |
-	connId := aConnection hash.
-	info := Dictionary new
-		        at: #connection put: aConnection;
-		        at: #intents put: aCollection asSet;
-		        yourself.
-	connectionsById at: connId put: info.
-	userConns := connectionsByUserId
-		             at: aUserId
-		             ifAbsentPut: [ OrderedCollection new ].
-	userConns add: aConnection.
-	StringSignal emit: ('{1} CONNECTED ({2}): {3}' format: {
-				 transportName.
-				 (aCollection asArray join: ',').
-				 aUserId }).
-	^ aConnection
-]
-
-{ #category : 'adding' }
-BlennyTransportBridge >> addSSEStream: aStream forUser: aUserId intents: aCollection [
-   "Temporary; will be overridden in BlennySSEBridge"
-   self addConnection: aStream forUser: aUserId intents: aCollection
-]
 
 { #category : 'publishing' }
 BlennyTransportBridge >> broadcastData: aPayload [
@@ -64,10 +36,9 @@ BlennyTransportBridge >> broadcastHtml: aPayload [
 
 { #category : 'publishing' }
 BlennyTransportBridge >> broadcastMessage: aMessage [
-
-	connectionsByUserId keysAndValuesDo: [ :userId :userDict |
-			userDict valuesDo: [ :handle |
-				self sendMessageIfIntentsPermit: aMessage to: handle ] ]
+    connectionsByUserId keysAndValuesDo: [ :userId :userDict |
+        userDict values do: [ :handle |
+            self sendMessageIfIntentsPermit: aMessage to: handle ] ]
 ]
 
 { #category : 'accessing' }
@@ -96,14 +67,13 @@ BlennyTransportBridge >> directMessage: aMessage to: aUserId [
 
 { #category : 'testing' }
 BlennyTransportBridge >> hasConnectionForUser: aUserId [
-   ^ connectionsByUserId includesKey: aUserId
+    ^ (connectionsByUserId at: aUserId ifAbsent: [ #() ]) notEmpty
 ]
 
 { #category : 'initialization' }
 BlennyTransportBridge >> initialize [
    super initialize.
    connectionsByUserId := Dictionary new.
-   connectionsById := Dictionary new.
    isRunning := false.
    transportName := 'transport'
 ]
@@ -158,6 +128,8 @@ BlennyTransportBridge >> publish: anAnnouncement [
 BlennyTransportBridge >> registerUser: aUserId stream: aStream intents: aCollection [
     | handle userDict |
     handle := BlennyConnectionHandle new.
+StringSignal emit: ('Registered connection for user {1}, total dict size: {2}' 
+    format: { aUserId. connectionsByUserId size }).
     handle
         userId: aUserId;
         connectionId: UUID new asString;
@@ -183,9 +155,9 @@ BlennyTransportBridge >> sendMessageIfIntentsPermit: aMessage to: aHandle [
     | intents msgCategory |
     intents := aHandle intents.
     intents ifNil: [ ^ self ].
-    (intents includes: #all) ifTrue: [ ^ self sendMessage: aMessage to: aHandle ].
+    (intents includes: #all) ifTrue: [ ^ self sendMessage: aMessage to: aHandle stream ].
     msgCategory := aMessage at: #category ifAbsent: [ #ui ].
-    (intents includes: msgCategory) ifTrue: [ self sendMessage: aMessage to: aHandle ]
+    (intents includes: msgCategory) ifTrue: [ self sendMessage: aMessage to: aHandle stream ]
 ]
 
 { #category : 'accessing' }
@@ -195,21 +167,17 @@ BlennyTransportBridge >> start [
 
 { #category : 'accessing' }
 BlennyTransportBridge >> stop [
-
-	isRunning := false.
-	announcer unsubscribe: self.
-	"Finalize all handles; they remove themselves from connectionsByUserId"
-	connectionsByUserId copy do: [ :userDict |
-			userDict copy do: [ :handle |
-					[ handle finalize ]
-						on: Error
-						do: [ :ex |
-								StringSignal emit: ('{1} failed to close: {2}' format: {
-											 transportName.
-											 ex messageText }) ] ] ].
-	connectionsByUserId removeAll.
-	StringSignal emit: ('{1} bridge stopped' format: { transportName }).
-	^ self
+    isRunning := false.
+    announcer unsubscribe: self.
+    "Finalize all handles; they remove themselves from connectionsByUserId"
+    connectionsByUserId copy do: [ :userDict |
+        userDict copy do: [ :handle |
+            [ handle finalize ] on: Error do: [ :ex |
+                StringSignal emit: ('{1} failed to close: {2}' format: {
+                    transportName. ex messageText }) ] ] ].
+    connectionsByUserId removeAll.
+    StringSignal emit: ('{1} bridge stopped' format: { transportName }).
+    ^ self
 ]
 
 { #category : 'accessing' }

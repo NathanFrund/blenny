@@ -21,14 +21,17 @@ Class {
 BlennyStandardSSEEncoder >> encodeMessage: aMessage [
    | payload eventName |
    payload := aMessage at: #html ifAbsent: [ aMessage at: #signals ifAbsent: [ ^ nil ] ].
-   "Map #ui category to 'message' for HTMX/EventSource defaults, otherwise use the category symbol"
+   "Ensure we write a proper string representation:
+    - strings (html) pass through
+    - anything else (e.g., Dictionary for signals) is JSON-encoded"
+   payload := payload isString 
+      ifTrue: [ payload ] 
+      ifFalse: [ NeoJSONWriter toString: payload ].
    eventName := (aMessage at: #category ifAbsent: [ #ui ]) = #ui
       ifTrue: [ 'message' ]
       ifFalse: [ (aMessage at: #category) asString ].
-
    ^ String streamContents: [ :stream |
       stream nextPutAll: 'event: '; nextPutAll: eventName; crlf.
-      stream nextPutAll: 'data: '; nextPutAll: payload asString; crlf.
+      stream nextPutAll: 'data: '; nextPutAll: payload; crlf.
       stream crlf ]
-
 ]

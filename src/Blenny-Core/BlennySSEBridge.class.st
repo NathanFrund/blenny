@@ -23,11 +23,6 @@ Class {
 	#package : 'Blenny-Core'
 }
 
-{ #category : 'adding' }
-BlennySSEBridge >> addSSEStream: aStream forUser: aUserId intents: aCollection [
-   self addConnection: aStream forUser: aUserId intents: aCollection
-]
-
 { #category : 'accessing' }
 BlennySSEBridge >> encoder [
 	^ encoder
@@ -43,11 +38,21 @@ BlennySSEBridge >> initializeWithEncoder: anSSEEncoder name: aString [
 
 { #category : 'utilities - objectiveC' }
 BlennySSEBridge >> sendMessage: aMessage to: aConnection [
-   | rawSSE |
-   rawSSE := encoder encodeMessage: aMessage.
-   rawSSE ifNotNil: [
-      [ aConnection nextPutAll: rawSSE; flush ]
-         on: Error do: [ :e |
-            StringSignal emit: ('SSE send error: {1}' format: { e messageText }) ] ]
 
+	| rawSSE |
+	rawSSE := encoder encodeMessage: aMessage.
+	Transcript
+		show: 'rawSSE (' , rawSSE size asString , ' bytes):';
+		cr;
+		show: rawSSE;
+		cr.
+	rawSSE ifNotNil: [
+			[
+				aConnection
+					nextPutAll: rawSSE;
+					flush ]
+				on: Error
+				do: [ :e |
+					StringSignal emit:
+						('SSE send error: {1}' format: { e messageText }) ] ]
 ]

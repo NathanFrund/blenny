@@ -35,31 +35,6 @@ Class {
 	#package : 'Blenny-Core'
 }
 
-{ #category : 'handling' }
-BlennyWebSocketBridge >> handleWebSocket: aWebSocket forUser: aUserId intents: aCollection [
-	"aWebSocket is an instance of ZnWebSocket already upgraded by the router."
-
-	self addConnection: aWebSocket forUser: aUserId intents: aCollection.
-
-	StringSignal emit: ('{1} CONNECTED ({2}): {3}' format: {
-				 transportName.
-				 (aCollection asArray join: ',').
-				 aUserId }).
-
-	[
-		[
-			aWebSocket runWith: [ :msg |
-					StringSignal emit: ('{1} [{2}]: {3}' format: {
-								 aUserId.
-								 transportName.
-								 msg asString }) ] ]
-			on: ConnectionClosed
-			do: [ :ex |
-				StringSignal emit:
-					('WebSocket disconnected: {1}' format: { aUserId }) ] ] ensure: [
-		self removeConnection: aWebSocket forUser: aUserId ]
-]
-
 { #category : 'accessing' }
 BlennyWebSocketBridge >> rawPayload [
    ^ rawPayload

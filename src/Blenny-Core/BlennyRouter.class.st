@@ -112,7 +112,7 @@ BlennyRouter >> handleSSE: request [
    intents := self intentsFromRequest: request defaults: #(ui).
    bridge := self sseBridge.
 
-   entity := DatastarLiveEntity updateBlock: [ :socketStream |
+   entity := BlennyLiveEntity updateBlock: [ :socketStream |
       self runSSEStream: socketStream forUser: userId withBridge: bridge intents: intents.
    ].
 
@@ -144,7 +144,7 @@ BlennyRouter >> handleStatic: request [
 
 { #category : 'handlers' }
 BlennyRouter >> handleWebSocket: request [
-   | token userId wsType bridge intents |
+   | token userId wsType bridge intents handlerBlock handle |
    wsType := (request uri segments size > 1 and: [ request uri segments second isString ])
       ifTrue: [ request uri segments second ]
       ifFalse: [ 'html' ].
@@ -158,16 +158,26 @@ BlennyRouter >> handleWebSocket: request [
    ((request headers at: 'Upgrade' ifAbsent: [ '' ]) asLowercase includesSubstring: 'websocket')
       ifFalse: [ ^ ZnResponse badRequest: request ].
 
-   "Retrieve the optional WebSocket bridge"
-    bridge := app transportNamed: 'ws-', wsType.
+   bridge := app transportNamed: 'ws-', wsType.
    bridge ifNil: [ ^ ZnResponse notFound: 'WebSocket not enabled' ].
 
-   "Parse intents, default to #all for backward compatibility"
    intents := self intentsFromRequest: request defaults: #(all).
 
-   ^ (ZnWebSocketDelegate handler: [ :webSocket |
-        bridge handleWebSocket: webSocket forUser: userId intents: intents ])
-        handleRequest: request
+   handlerBlock := [ :webSocket |
+      handle := bridge registerUser: userId stream: webSocket intents: intents.
+      [
+         webSocket runWith: [ :msg |
+            "Echo or handle incoming messages – keep if needed, or remove."
+            StringSignal emit: ('{1} [{2}]: {3}' format: {
+               userId.
+               bridge transportName.
+               msg asString }) ]
+      ] ensure: [
+         handle finalize
+      ].
+   ].
+
+   ^ (ZnWebSocketDelegate handler: handlerBlock) handleRequest: request
 ]
 
 { #category : 'initialization' }
@@ -221,27 +231,26 @@ BlennyRouter >> routes [
 
 { #category : 'handlers' }
 BlennyRouter >> runSSEStream: socketStream forUser: userId withBridge: bridge intents: intents [
-   [
-      bridge addSSEStream: socketStream forUser: userId intents: intents.
-      
-      "Give the client a moment to be ready for signals"
-      (Delay forMilliseconds: 100) wait.
+    | handle |
+    handle := bridge registerUser: userId stream: socketStream intents: intents.
+    [
+        "Give the client a moment to be ready for signals"
+        (Delay forMilliseconds: 100) wait.
 
-      bridge
-         directMessage: (Dictionary new
-            at: #signals put: { #connected -> true } asDictionary;
-            at: #category put: #ui;
-            yourself)
-         to: userId.
+        bridge
+            directMessage: (Dictionary new
+                at: #signals put: { #connected -> true } asDictionary;
+                at: #category put: #ui;
+                yourself)
+            to: userId.
 
-      "Idle forever: Datastar holds the connection; a periodic comment prevents proxy timeouts"
-      [ true ] whileTrue: [
-         (Delay forSeconds: 15) wait.
-         socketStream nextPutAll: ': keep-alive'; nextPutAll: String crlf; nextPutAll: String crlf; flush ]
-   ] ensure: [
-      bridge removeConnection: socketStream forUser: userId.
-      socketStream close.
-   ].
+        "Idle forever: Datastar holds the connection; a periodic comment prevents proxy timeouts"
+        [ true ] whileTrue: [
+            (Delay forSeconds: 15) wait.
+            socketStream nextPutAll: ': keep-alive'; nextPutAll: String crlf; nextPutAll: String crlf; flush ]
+    ] ensure: [
+        handle finalize.
+    ].
 ]
 
 { #category : 'accessing' }
