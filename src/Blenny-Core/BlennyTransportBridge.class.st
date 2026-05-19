@@ -152,12 +152,12 @@ BlennyTransportBridge >> sendMessage: aMessage to: aConnection [
 
 { #category : 'publishing' }
 BlennyTransportBridge >> sendMessageIfIntentsPermit: aMessage to: aHandle [
-    | intents msgCategory |
+    | intents cat |
     intents := aHandle intents.
-    intents ifNil: [ ^ self ].
+    cat := aMessage at: #category ifAbsent: [#ui].
     (intents includes: #all) ifTrue: [ ^ self sendMessage: aMessage to: aHandle stream ].
-    msgCategory := aMessage at: #category ifAbsent: [ #ui ].
-    (intents includes: msgCategory) ifTrue: [ self sendMessage: aMessage to: aHandle stream ]
+    (intents includes: cat) ifTrue: [ ^ self sendMessage: aMessage to: aHandle stream ].
+    "otherwise discard"
 ]
 
 { #category : 'accessing' }

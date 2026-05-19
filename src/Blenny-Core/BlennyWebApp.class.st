@@ -82,7 +82,7 @@ BlennyWebApp >> broadcast: aMessage toUser: aUserId [
 
 { #category : 'publishing' }
 BlennyWebApp >> broadcastData: aString [
-    self broadcastMessage: (Dictionary with: #signals -> aString with: #category -> #ui)
+    self broadcastMessage: (Dictionary with: #signals -> aString with: #category -> #data)
 ]
 
 { #category : 'publishing' }
@@ -132,7 +132,7 @@ BlennyWebApp >> createAuthProvider [
 { #category : 'publishing' }
 BlennyWebApp >> directData: aString toUser: aUserId [
    self
-      broadcast: (Dictionary with: #signals -> aString with: #category -> #ui)
+      broadcast: (Dictionary with: #signals -> aString with: #category -> #data)
       toUser: aUserId
 ]
 
