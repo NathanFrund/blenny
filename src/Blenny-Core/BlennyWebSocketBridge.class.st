@@ -28,29 +28,29 @@ I use a dictionary-based client store:
 Class {
 	#name : 'BlennyWebSocketBridge',
 	#superclass : 'BlennyTransportBridge',
-	#instVars : [
-		'rawPayload'
-	],
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
 }
 
-{ #category : 'accessing' }
-BlennyWebSocketBridge >> rawPayload [
-   ^ rawPayload
-]
-
-{ #category : 'accessing' }
-BlennyWebSocketBridge >> rawPayload: aBoolean [
-   rawPayload := aBoolean
-]
-
 { #category : 'utilities - objectiveC' }
-BlennyWebSocketBridge >> sendMessage: aMessage to: aConnection [
-   rawPayload == true
-      ifTrue: [
-         | payload |
-         payload := aMessage at: #html ifAbsent: [ aMessage at: #signals ifAbsent: [ nil ] ].
-         payload ifNotNil: [ aConnection sendMessage: payload ] ]
-      ifFalse: [ aConnection sendMessage: (NeoJSONWriter toString: aMessage) ]
+BlennyWebSocketBridge >> sendMessage: aMessage to: aWebSocket [
+    | category payload |
+    category := aMessage at: #category ifAbsent: [#ui].
+    payload := aMessage at: #html ifAbsent: [ aMessage at: #signals ifAbsent: [ nil ] ].
+    payload ifNil: [ ^ self ].
+    
+    category = #ui
+        ifTrue: [ aWebSocket sendMessage: payload ]   "raw HTML"
+        ifFalse: [ aWebSocket sendMessage: (NeoJSONWriter toString: aMessage) ]
+]
+
+{ #category : 'accessing' }
+BlennyWebSocketBridge >> stop [
+    "Close all WebSocket connections to break read loops before finalization"
+    connectionsByUserId do: [ :userDict |
+        userDict valuesDo: [ :handle |
+            handle stream ifNotNil: [ :ws |
+                [ ws close ] on: Error do: [ :ex |
+                    StringSignal emit: ('WS close error: {1}' format: { ex messageText }) ] ] ] ].
+    super stop.   "now finalize all handles (will close streams again, but that's fine)"
 ]

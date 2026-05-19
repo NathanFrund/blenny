@@ -151,21 +151,12 @@ BlennyWebApp >> discoverModules [
 
 { #category : 'server' }
 BlennyWebApp >> enableWebSocketsWithDefaultIntents: intents [
-    | htmlBridge dataBridge |
-    "HTML endpoint – sends raw HTML (no JSON wrapper)"
-    htmlBridge := BlennyWebSocketBridge new
-        initializeWithName: 'ws-html';
-        rawPayload: true;
+    | bridge |
+    bridge := BlennyWebSocketBridge new
+        initializeWithName: 'ws';
         start.
-    optionalTransports add: htmlBridge.
-
-    "Data endpoint – sends full message dictionary as JSON"
-    dataBridge := BlennyWebSocketBridge new
-        initializeWithName: 'ws-data';
-        start.  "rawPayload defaults to false → JSON"
-    optionalTransports add: dataBridge.
-    
-    ^ htmlBridge
+    optionalTransports add: bridge.
+    ^ bridge   "return the bridge for further configuration if needed"
 ]
 
 { #category : 'initialization' }
@@ -334,24 +325,30 @@ BlennyWebApp >> startServer [
 
 { #category : 'server' }
 BlennyWebApp >> stop [
-	"Stop modules first (so they can clean up)"
 
+	"1. Stop modules first (so they can clean up)"
 	modules do: [ :module | module stopModule ].
 
-	"Stop HTTP server"
+	"2. Stop all transports (SSE and WebSocket bridges) – this closes connections cleanly"
+	sseBridge ifNotNil: [ sseBridge stop ].
+	optionalTransports ifNotNil: [ optionalTransports do: [ :t | t stop ] ].
+	
+	(Delay forMilliseconds: 100) wait.
+
+	"4 Stop HTTP server"
 	server ifNotNil: [
 			server stop.
 			server := nil ].
 
-	"Stop Conduit file watcher"
+	"5 Stop Conduit file watcher"
 	conduit ifNotNil: [
 			conduit stop.
 			conduit := nil ].
 
-	"Stop auth janitor"
+	"6 Stop auth janitor"
 	authProvider shutdown.
 
-	"Reset so next start sees fresh values"
+	"6. Reset so next start sees fresh values"
 	BlennyConfig reset.
 	BlennyPublisher reset.
 

@@ -88,7 +88,7 @@ BlennyRouter >> handleRequest: request [
    (path beginsWith: '/sse') ifTrue: [ ^ self handleSSE: request ].
 
    "3. WebSocket endpoint – only if WebSocket bridge is enabled"
-   (path beginsWith: '/ws/') ifTrue: [ ^ self handleWebSocket: request ].
+   (path beginsWith: '/ws') ifTrue: [ ^ self handleWebSocket: request ].
 
    "4. Static files"
    (path beginsWith: '/static/') ifTrue: [ ^ self handleStatic: request ].
@@ -144,40 +144,46 @@ BlennyRouter >> handleStatic: request [
 
 { #category : 'handlers' }
 BlennyRouter >> handleWebSocket: request [
-   | token userId wsType bridge intents handlerBlock handle |
-   wsType := (request uri segments size > 1 and: [ request uri segments second isString ])
-      ifTrue: [ request uri segments second ]
-      ifFalse: [ 'html' ].
 
-   token := self extractTokenFrom: request.
-   token ifNil: [ ^ ZnResponse unauthorized: 'Missing token' ].
+	| path token userId bridge intents handlerBlock |
+	path := request uri pathPrintString.
+	path ~= '/ws' ifTrue: [ ^ ZnResponse notFound: path ].
 
-   userId := app authProvider validateToken: token.
-   userId ifNil: [ ^ ZnResponse unauthorized: 'Invalid token' ].
+	token := self extractTokenFrom: request.
+	token ifNil: [ ^ ZnResponse unauthorized: 'Missing token' ].
+	userId := app authProvider validateToken: token.
+	userId ifNil: [ ^ ZnResponse unauthorized: 'Invalid token' ].
 
-   ((request headers at: 'Upgrade' ifAbsent: [ '' ]) asLowercase includesSubstring: 'websocket')
-      ifFalse: [ ^ ZnResponse badRequest: request ].
+	((request headers at: 'Upgrade' ifAbsent: [ '' ]) asLowercase
+		 includesSubstring: 'websocket') ifFalse: [
+		^ ZnResponse badRequest: request ].
 
-   bridge := app transportNamed: 'ws-', wsType.
-   bridge ifNil: [ ^ ZnResponse notFound: 'WebSocket not enabled' ].
+	bridge := app transportNamed: 'ws'.
+	bridge ifNil: [ ^ ZnResponse notFound: 'WebSocket not enabled' ].
 
-   intents := self intentsFromRequest: request defaults: #(all).
+	intents := self intentsFromRequest: request defaults: #( all ).
 
-   handlerBlock := [ :webSocket |
-      handle := bridge registerUser: userId stream: webSocket intents: intents.
-      [
-         webSocket runWith: [ :msg |
-            "Echo or handle incoming messages – keep if needed, or remove."
-            StringSignal emit: ('{1} [{2}]: {3}' format: {
-               userId.
-               bridge transportName.
-               msg asString }) ]
-      ] ensure: [
-         handle finalize
-      ].
-   ].
+	handlerBlock := [ :webSocket |
+		                | handle |
+		                handle := bridge
+			                          registerUser: userId
+			                          stream: webSocket
+			                          intents: intents.
+		                [
+			                [
+				                webSocket runWith: [ :msg | "Handle incoming message"
+						                StringSignal emit:
+							                ('WS received from {1}: {2}' format: {
+									                 userId.
+									                 msg asString }) ] ]
+				                on: ConnectionClosed , SocketError , Error
+				                do: [ :ex | "Normal during shutdown – exit quietly"
+					                StringSignal emit:
+						                ('WS loop exiting: {1}' format:
+							                 { ex messageText }) ] ] ensure: [
+			                handle finalize ] ].
 
-   ^ (ZnWebSocketDelegate handler: handlerBlock) handleRequest: request
+	^ (ZnWebSocketDelegate handler: handlerBlock) handleRequest: request
 ]
 
 { #category : 'initialization' }

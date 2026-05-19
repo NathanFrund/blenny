@@ -26,7 +26,7 @@ Class {
 
 { #category : 'publishing' }
 BlennyTransportBridge >> broadcastData: aPayload [
-   self broadcastMessage: (Dictionary with: #signals -> aPayload with: #category -> #ui)
+   self broadcastMessage: (Dictionary with: #signals -> aPayload with: #category -> #data)
 ]
 
 { #category : 'publishing' }
