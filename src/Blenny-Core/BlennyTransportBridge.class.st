@@ -64,13 +64,17 @@ BlennyTransportBridge >> broadcastHtml: aPayload [
 
 { #category : 'publishing' }
 BlennyTransportBridge >> broadcastMessage: aMessage [
-   connectionsByUserId keysAndValuesDo: [ :userId :conns |
-      conns do: [ :conn | self sendMessageIfIntentsPermit: aMessage to: conn ] ]
+
+	connectionsByUserId keysAndValuesDo: [ :userId :userDict |
+			userDict valuesDo: [ :handle |
+				self sendMessageIfIntentsPermit: aMessage to: handle ] ]
 ]
 
 { #category : 'accessing' }
 BlennyTransportBridge >> connectionsForUserId: aUserId [
-   ^ connectionsByUserId at: aUserId ifAbsent: [ #() ]
+    | userDict |
+    userDict := connectionsByUserId at: aUserId ifAbsent: [ ^ #() ].
+    ^ userDict values
 ]
 
 { #category : 'publishing' }
@@ -86,8 +90,8 @@ BlennyTransportBridge >> directHtml: aPayload to: aUserId [
 
 { #category : 'publishing' }
 BlennyTransportBridge >> directMessage: aMessage to: aUserId [
-   (self connectionsForUserId: aUserId) do: [ :conn |
-      self sendMessageIfIntentsPermit: aMessage to: conn ]
+    (self connectionsForUserId: aUserId) do: [ :handle |
+        self sendMessageIfIntentsPermit: aMessage to: handle ]
 ]
 
 { #category : 'testing' }
@@ -109,7 +113,6 @@ BlennyTransportBridge >> initializeWithName: aString [
    transportName := aString.
    announcer := Announcer new.
    connectionsByUserId := Dictionary new.
-   connectionsById := Dictionary new.
    isRunning := true.
 
    "Subscribe to all existing announcement types"
@@ -141,13 +144,6 @@ BlennyTransportBridge >> initializeWithName: aString [
 ]
 
 { #category : 'accessing' }
-BlennyTransportBridge >> intentsForConnection: aConnection [
-   | info |
-   info := connectionsById at: aConnection hash ifAbsent: [ ^ nil ].
-   ^ info at: #intents
-]
-
-{ #category : 'accessing' }
 BlennyTransportBridge >> isRunning [
    ^ isRunning
 ]
@@ -158,16 +154,23 @@ BlennyTransportBridge >> publish: anAnnouncement [
    announcer announce: anAnnouncement
 ]
 
-{ #category : 'removing' }
-BlennyTransportBridge >> removeConnection: aConnection forUser: aUserId [
-   | connId userConns |
-   connId := aConnection hash.
-   connectionsById removeKey: connId ifAbsent: [ ^ self ].
-   userConns := connectionsByUserId at: aUserId ifAbsent: [ ^ self ].
-   userConns remove: aConnection ifAbsent: [].
-   userConns ifEmpty: [ connectionsByUserId removeKey: aUserId ].
-   StringSignal emit: ('{1} DISCONNECTED: {2}' format: { transportName. aUserId }).
-
+{ #category : 'as yet unclassified' }
+BlennyTransportBridge >> registerUser: aUserId stream: aStream intents: aCollection [
+    | handle userDict |
+    handle := BlennyConnectionHandle new.
+    handle
+        userId: aUserId;
+        connectionId: UUID new asString;
+        stream: aStream;
+        intents: aCollection asSet;
+        connectionsByUserId: connectionsByUserId.
+    userDict := connectionsByUserId at: aUserId ifAbsentPut: [ Dictionary new ].
+    userDict at: handle connectionId put: handle.
+    StringSignal emit: ('{1} CONNECTED ({2}): {3}' format: {
+        transportName.
+        (aCollection asArray join: ',').
+        aUserId }).
+    ^ handle
 ]
 
 { #category : 'utilities - objectiveC' }
@@ -176,13 +179,13 @@ BlennyTransportBridge >> sendMessage: aMessage to: aConnection [
 ]
 
 { #category : 'publishing' }
-BlennyTransportBridge >> sendMessageIfIntentsPermit: aMessage to: aConnection [
-   | intents msgCategory |
-   intents := self intentsForConnection: aConnection.
-   intents ifNil: [ ^ self ].
-   (intents includes: #all) ifTrue: [ ^ self sendMessage: aMessage to: aConnection ].
-   msgCategory := aMessage at: #category ifAbsent: [ #ui ].
-   (intents includes: msgCategory) ifTrue: [ self sendMessage: aMessage to: aConnection ]
+BlennyTransportBridge >> sendMessageIfIntentsPermit: aMessage to: aHandle [
+    | intents msgCategory |
+    intents := aHandle intents.
+    intents ifNil: [ ^ self ].
+    (intents includes: #all) ifTrue: [ ^ self sendMessage: aMessage to: aHandle ].
+    msgCategory := aMessage at: #category ifAbsent: [ #ui ].
+    (intents includes: msgCategory) ifTrue: [ self sendMessage: aMessage to: aHandle ]
 ]
 
 { #category : 'accessing' }
@@ -195,14 +198,15 @@ BlennyTransportBridge >> stop [
 
 	isRunning := false.
 	announcer unsubscribe: self.
-	connectionsById copy valuesDo: [ :info |
-			[ (info at: #connection) close ]
-				on: Error
-				do: [ :ex |
-						StringSignal emit: ('{1} failed to close: {2}' format: {
-									 transportName.
-									 ex messageText }) ] ].
-	connectionsById removeAll.
+	"Finalize all handles; they remove themselves from connectionsByUserId"
+	connectionsByUserId copy do: [ :userDict |
+			userDict copy do: [ :handle |
+					[ handle finalize ]
+						on: Error
+						do: [ :ex |
+								StringSignal emit: ('{1} failed to close: {2}' format: {
+											 transportName.
+											 ex messageText }) ] ] ].
 	connectionsByUserId removeAll.
 	StringSignal emit: ('{1} bridge stopped' format: { transportName }).
 	^ self
