@@ -1,3 +1,23 @@
+"
+I hold the state for a single client connection (SSE or WebSocket).
+
+I manage:
+- Unique connection identifier (UUID) for per‑tab targeting
+- User ID associated with the connection
+- The underlying stream (or WebSocket) for writing
+- Intent set (categories the client wants to receive)
+- A reference back to the bridge's connections dictionary for cleanup
+
+I am created by BlennyTransportBridge when a client connects.
+My #finalize method removes me from the bridge's registry and closes the stream.
+
+Example usage (inside a bridge):
+
+    handle := bridge registerUser: userId stream: socketStream intents: #(ui).
+    [
+        ... use handle ...
+    ] ensure: [ handle finalize ]
+"
 Class {
 	#name : 'BlennyConnectionHandle',
 	#superclass : 'Object',

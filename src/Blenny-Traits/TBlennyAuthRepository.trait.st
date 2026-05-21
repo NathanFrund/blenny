@@ -1,3 +1,34 @@
+"
+I am the repository trait for authentication storage in Blenny.
+
+My responsibility is to define the contract for storing and retrieving
+user accounts, password reset tokens, and token blacklist entries.
+
+Implementors must provide:
+- #at:ifAbsent:      → retrieve a value by key
+- #at:put:           → store a value by key
+- #removeKey:        → delete a key
+- #allKeys           → answer all keys in the repository
+
+The key naming convention used by BlennySimpleAuth:
+- 'user_<username>'       → user dictionary
+- 'blacklist_<jti>'       → expiration timestamp
+- 'reset_<token>'         → reset token data
+
+Concrete backends (memory, file, SQLite, Redis) should use this trait
+to ensure a consistent API for the authentication system.
+
+Example usage (inside a concrete class):
+
+    MyRepository >> at: aKey ifAbsent: aBlock
+        ^ myDictionary at: aKey ifAbsent: aBlock
+
+    MyRepository >> allKeys
+        ^ myDictionary keys
+
+Note: This trait does not provide default implementations; it only
+declares the required methods. Subclasses must implement them.
+"
 Trait {
 	#name : 'TBlennyAuthRepository',
 	#traits : 'TBlennyRepository',

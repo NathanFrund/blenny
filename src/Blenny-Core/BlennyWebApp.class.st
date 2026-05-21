@@ -21,8 +21,6 @@ Class {
 	#superclass : 'Object',
 	#instVars : [
 		'server',
-		'port',
-		'rootPath',
 		'conduit',
 		'authService',
 		'authProvider',
@@ -47,14 +45,11 @@ BlennyWebApp class >> default [
 
 { #category : 'server' }
 BlennyWebApp >> announceStarted [
-
-	| mode |
-	mode := rootPath ifNil: [ 'frozen' ] ifNotNil: [ 'disk' ].
-	StringSignal emit:
-		('Server started on port {1} ({2} mode). SSE: http://localhost:{1}/sse'
-			 format: {
-					 port.
-					 mode })
+    | mode |
+    mode := config isDiskMode ifTrue: [ 'disk' ] ifFalse: [ 'frozen' ].
+    StringSignal emit:
+        ('Server started on port {1} ({2} mode). SSE: http://localhost:{1}/sse'
+            format: { config port. mode })
 ]
 
 { #category : 'authentication' }
@@ -118,7 +113,7 @@ BlennyWebApp >> buildRouter [
 	router := BlennyRouter new initializeWith: {
 			          ('renderer' -> renderer).
 			          ('app' -> self).
-			          ('rootPath' -> rootPath) } asDictionary.
+			          ('rootPath' -> config rootPath) } asDictionary.
 
 	"1. Install authentication middleware (core framework responsibility)"
 	activeAuth ifNotNil: [
@@ -190,8 +185,10 @@ BlennyWebApp >> enableWebSocketsWithDefaultIntents: intents [
 BlennyWebApp >> initialize [
 
 	super initialize.
-	port := BlennyConfig current at: 'port' ifAbsent: [ 8081 ].
-	modules := OrderedCollection new.
+    "Default config (will be overridden when startOn:port: is called)"
+    config := BlennyServerConfig new.
+    config port: (BlennyConfig current at: 'port' ifAbsent: [ 8081 ]).
+    modules := OrderedCollection new.
 ]
 
 { #category : 'authentication' }
@@ -273,6 +270,13 @@ BlennyWebApp >> renderer [
 	^ renderer 
 ]
 
+{ #category : 'server - private' }
+BlennyWebApp >> resetGlobalState [
+    BlennyConfig reset.
+    BlennyPublisher reset.
+    BlennyFileLogger attachToBeacon
+]
+
 { #category : 'accessing' }
 BlennyWebApp >> router [
 	^ router 
@@ -296,10 +300,36 @@ BlennyWebApp >> setupDiskWatcher [
 
 	| templatesPath |
 	conduit ifNotNil: [ ^ self ].
-	templatesPath := rootPath / 'templates'.
+	templatesPath := config rootPath / 'templates'.
 	templatesPath exists ifFalse: [ ^ self ].
 	conduit := Conduit pointingAt: templatesPath pathString.
 	conduit start
+]
+
+{ #category : 'server - private' }
+BlennyWebApp >> setupRenderer [
+    renderer := BlennyRenderer new
+        initializeWithConduit: conduit
+        rootPath: config rootPath
+]
+
+{ #category : 'server - private' }
+BlennyWebApp >> setupRouter [
+    self loadModules.   "already loads and initializes modules"
+    self startModules.
+    router := self buildRouter.
+    "Retain auth service for cleanup"
+    authService := (self discoverAuthProvider) ifNotNil: [ :p | p authService ]
+]
+
+{ #category : 'server - private' }
+BlennyWebApp >> setupSSE [
+    | encoderClass |
+    encoderClass := Smalltalk at: (BlennyConfig current at: 'sse.encoder' ifAbsent: [ #BlennyStandardSSEEncoder ]) asSymbol.
+    sseBridge := BlennySSEBridge new
+        initializeWithEncoder: encoderClass new name: 'sse';
+        start.
+    optionalTransports := OrderedCollection new.
 ]
 
 { #category : 'accessing' }
@@ -314,65 +344,39 @@ BlennyWebApp >> startModules [
 
 { #category : 'server' }
 BlennyWebApp >> startOn: aPath [
-    self startOn: aPath port: port.
+    self startOn: aPath port: config port.
 ]
 
 { #category : 'server' }
 BlennyWebApp >> startOn: aPath port: aPortNumber [
     self stop.
-    port := aPortNumber.
-    rootPath := aPath ifNotNil: [ aPath asFileReference ].
-    
-    rootPath ifNotNil: [ self setupDiskWatcher ].
-    self startServer.
+    config := BlennyServerConfig new
+        port: aPortNumber;
+        rootPath: (aPath ifNotNil: [ aPath asFileReference ]);
+        yourself.
+    config isDiskMode ifTrue: [ self setupDiskWatcher ].
+    self startServer
 ]
 
 { #category : 'server' }
 BlennyWebApp >> startServer [
+    self resetGlobalState.
+    self stopConflictingServers.
+    self setupSSE.
+    self setupRenderer.
+    self loadModules.
+    self startModules.
+    self setupRouter.
+    self startZnServer.
+    self announceStarted
+]
 
-	| bindAddress encoderClass |
-	BlennyConfig reset.
-	BlennyPublisher reset.
-	BlennyFileLogger attachToBeacon.
-
-	ZnServer allInstancesDo: [ :s | s port = port ifTrue: [ s stop ] ].
-
-	bindAddress := BlennyConfig current bindAddress.
-	encoderClass := Smalltalk at: (BlennyConfig current
-			                 at: 'sse.encoder'
-			                 ifAbsent: [ #BlennyStandardSSEEncoder ]) asSymbol.
-
-	sseBridge := BlennySSEBridge new
-		             initializeWithEncoder: encoderClass new name: 'sse';
-		             start.
-
-	optionalTransports := OrderedCollection new.
-
-	renderer := BlennyRenderer new
-		            initializeWithConduit: conduit
-		            rootPath: rootPath.
-
-	"===== MODULE LOADING ====="
-	self loadModules.
-	self startModules.
-	"========================="
-
-	"Build router with new pluggable auth system"
-	router := self buildRouter.
-
-	"Retain the auth service for cleanup"
-	"Retain the auth service for cleanup"
-	authService := self discoverAuthProvider ifNotNil: [ :provider |
-		               provider authService ].
-
-	"Start HTTP server"
-	server := ZnServer on: port.
-	server bindingAddress:
-		(NetNameResolver addressForName: bindAddress) asByteArray.
-	server delegate: router.
-	server start.
-
-	self announceStarted
+{ #category : 'server - private' }
+BlennyWebApp >> startZnServer [
+    server := ZnServer on: config port.
+    server bindingAddress: (NetNameResolver addressForName: config bindAddress) asByteArray.
+    server delegate: router.
+    server start
 ]
 
 { #category : 'server' }
@@ -400,6 +404,11 @@ BlennyWebApp >> stop [
 	BlennyPublisher reset.
 
 	StringSignal emit: 'Blenny server stopped.'
+]
+
+{ #category : 'server - private' }
+BlennyWebApp >> stopConflictingServers [
+    ZnServer allInstancesDo: [ :s | s port = config port ifTrue: [ s stop ] ].
 ]
 
 { #category : 'accessing' }

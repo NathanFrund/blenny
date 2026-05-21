@@ -124,12 +124,10 @@ BlennyTransportBridge >> publish: anAnnouncement [
    announcer announce: anAnnouncement
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'connection management' }
 BlennyTransportBridge >> registerUser: aUserId stream: aStream intents: aCollection [
     | handle userDict |
     handle := BlennyConnectionHandle new.
-StringSignal emit: ('Registered connection for user {1}, total dict size: {2}' 
-    format: { aUserId. connectionsByUserId size }).
     handle
         userId: aUserId;
         connectionId: UUID new asString;
@@ -145,12 +143,12 @@ StringSignal emit: ('Registered connection for user {1}, total dict size: {2}'
     ^ handle
 ]
 
-{ #category : 'utilities - objectiveC' }
+{ #category : 'subclass responsibility' }
 BlennyTransportBridge >> sendMessage: aMessage to: aConnection [
    self subclassResponsibility
 ]
 
-{ #category : 'publishing' }
+{ #category : 'dispatching' }
 BlennyTransportBridge >> sendMessageIfIntentsPermit: aMessage to: aHandle [
     | intents cat |
     intents := aHandle intents.
