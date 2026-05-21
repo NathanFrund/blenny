@@ -30,35 +30,6 @@ TBlennyModule classSide >> isEnabled [
    ^ true
 ]
 
-{ #category : 'adding' }
-TBlennyModule >> addAuthenticationTo: aRouter appPublicPaths: appPublicPaths [
-    | allPublicPaths |
-    allPublicPaths := Set new.
-    allPublicPaths addAll: self publicPaths.
-    allPublicPaths addAll: appPublicPaths.
-    
-    aRouter addMiddlewareFirst: [ :nextHandler :request |
-        | path user response |
-        path := request uri pathPrintString.
-        Transcript show: 'Auth middleware checking path: ' , path; cr.
-        Transcript show: 'Public paths: ' , allPublicPaths asArray printString; cr.
-        
-        (allPublicPaths anySatisfy: [ :prefix |
-            prefix = '/'
-                ifTrue: [ path = '/' ]
-                ifFalse: [ path beginsWith: prefix ] ])
-            ifTrue: [ response := nextHandler value: request ]
-            ifFalse: [
-                user := self authenticateRequest: request.
-                user ifNotNil: [
-                    request environment at: #user put: user.
-                    response := nextHandler value: request ]
-                ifNil: [ response := self unauthorizedResponseFor: request ] ].
-        response ].
-    ^ aRouter
-
-]
-
 { #category : 'accessing' }
 TBlennyModule >> authProvider [
     "Subclasses must provide this"
@@ -144,11 +115,6 @@ TBlennyModule >> isAuthProvider [
 TBlennyModule >> moduleName [
     "Returns 'blennyauth' if the class is BlennyAuthModule"
     ^ (self class name asString withoutSuffix: 'Module') asLowercase
-]
-
-{ #category : 'auth-configuration' }
-TBlennyModule >> publicPaths [
-    ^ #()
 ]
 
 { #category : 'required' }

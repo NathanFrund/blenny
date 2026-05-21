@@ -124,37 +124,29 @@ BlennyWebApp >> broadcastMessage: aMessage [
 
 { #category : 'refactoring-pass' }
 BlennyWebApp >> buildRouter [
-    | activeAuth |
 
-    activeAuth := self discoverAuthProvider.
+	| activeAuth |
+	activeAuth := self discoverAuthProvider.
 
-Transcript show: 'Active auth provider: ' , activeAuth class name; cr.
-Transcript show: 'Its publicPaths: ' , activeAuth publicPaths asArray printString; cr.
-Transcript show: 'Its authRoutes count: ' , activeAuth authRoutes size asString; cr.
-    
-    router := BlennyRouter new initializeWith: {
-        'renderer' -> renderer.
-        'app' -> self.
-        'rootPath' -> rootPath
-    } asDictionary.
-    
-    "1. Auth Layer"
-    activeAuth ifNotNil: [
-    router := activeAuth addAuthenticationTo: router appPublicPaths: self appPublicPaths.
-    self registerAuthRoutes: activeAuth on: router.
-].
+	router := BlennyRouter new initializeWith: {
+			          ('renderer' -> renderer).
+			          ('app' -> self).
+			          ('rootPath' -> rootPath) } asDictionary.
 
-Transcript show: 'All routes after auth registration:'; cr.
-router routes do: [ :r | Transcript show: '  ' , (r at: 'path'); cr ].
-router registerGet: '/test' handler: [ :req | ZnResponse ok: (ZnEntity html: 'test') ].
-        
-    "2. Register normal modules"
-    self registerModulesWithRouter: router.
-    
-    "3. Default middleware"
-    self setupDefaultMiddlewareOn: router.
-        
-    ^ router
+	"1. Install authentication middleware (core framework responsibility)"
+	activeAuth ifNotNil: [
+			router := self
+				          installAuthenticationMiddlewareOn: router
+				          using: activeAuth.
+			self registerAuthRoutes: activeAuth on: router ].
+
+	"2. Register normal modules"
+	self registerModulesWithRouter: router.
+
+	"3. Default middleware (logging, security)"
+	self setupDefaultMiddlewareOn: router.
+
+	^ router
 ]
 
 { #category : 'accessing' }
@@ -237,6 +229,30 @@ BlennyWebApp >> initializeLoadedModules [
         module initializeModule ]
 ]
 
+{ #category : 'as yet unclassified' }
+BlennyWebApp >> installAuthenticationMiddlewareOn: aRouter using: anAuthModule [
+    | allPublicPaths |
+    allPublicPaths := Set new.
+    allPublicPaths addAll: self appPublicPaths.
+    allPublicPaths addAll: anAuthModule publicPaths.  "still need module to provide its own public paths"
+    
+    aRouter addMiddlewareFirst: [ :nextHandler :request |
+        | path user response |
+        path := request uri pathPrintString.
+        (allPublicPaths anySatisfy: [ :prefix |
+            prefix = '/'
+                ifTrue: [ path = '/' ]
+                ifFalse: [ path beginsWith: prefix ] ])
+            ifTrue: [ response := nextHandler value: request ]
+            ifFalse: [
+                user := anAuthModule authenticateRequest: request.
+                user ifNotNil: [
+                    response := nextHandler value: request ]
+                ifNil: [ response := ZnResponse redirect: '/login' ] ].
+        response ].
+    ^ aRouter
+]
+
 { #category : 'modules' }
 BlennyWebApp >> loadModule: aModuleClass [
     | module |
@@ -315,11 +331,13 @@ BlennyWebApp >> setupDefaultMiddlewareOn: aRouter [
 
 { #category : 'private' }
 BlennyWebApp >> setupDiskWatcher [
-    | templatesPath |
-    templatesPath := rootPath / 'templates'.
-    templatesPath exists ifFalse: [ ^ self ].
-    conduit := Conduit pointingAt: templatesPath pathString.
-    conduit start.
+
+	| templatesPath |
+	conduit ifNotNil: [ ^ self ].
+	templatesPath := rootPath / 'templates'.
+	templatesPath exists ifFalse: [ ^ self ].
+	conduit := Conduit pointingAt: templatesPath pathString.
+	conduit start
 ]
 
 { #category : 'accessing' }
@@ -369,8 +387,6 @@ BlennyWebApp >> startServer [
 
 	optionalTransports := OrderedCollection new.
 
-	rootPath ifNotNil: [ self setupDiskWatcher ].
-
 	renderer := BlennyRenderer new
 		            initializeWithConduit: conduit
 		            rootPath: rootPath.
@@ -415,14 +431,8 @@ BlennyWebApp >> stop [
 			server stop.
 			server := nil ].
 
-	"4 Stop Conduit file watcher"
-	conduit ifNotNil: [
-			conduit stop.
-			conduit := nil ].
-
-	"5. Stop auth service (token validator)"
+	"4. Stop auth service (token validator)"
     authService ifNotNil: [ authService shutdown ].
-
 
 	"6. Reset so next start sees fresh values"
 	BlennyConfig reset.
