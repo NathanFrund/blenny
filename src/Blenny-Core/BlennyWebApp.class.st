@@ -234,22 +234,20 @@ BlennyWebApp >> installAuthenticationMiddlewareOn: aRouter using: anAuthModule [
     | allPublicPaths |
     allPublicPaths := Set new.
     allPublicPaths addAll: self appPublicPaths.
-    allPublicPaths addAll: anAuthModule publicPaths.  "still need module to provide its own public paths"
+    allPublicPaths addAll: anAuthModule publicPaths.
     
     aRouter addMiddlewareFirst: [ :nextHandler :request |
-        | path user response |
+        | path user |
         path := request uri pathPrintString.
         (allPublicPaths anySatisfy: [ :prefix |
             prefix = '/'
                 ifTrue: [ path = '/' ]
                 ifFalse: [ path beginsWith: prefix ] ])
-            ifTrue: [ response := nextHandler value: request ]
+            ifTrue: [ nextHandler value: request ]
             ifFalse: [
                 user := anAuthModule authenticateRequest: request.
-                user ifNotNil: [
-                    response := nextHandler value: request ]
-                ifNil: [ response := ZnResponse redirect: '/login' ] ].
-        response ].
+                user ifNotNil: [ nextHandler value: request ]
+                ifNil: [ ZnResponse redirect: '/login' ] ] ].
     ^ aRouter
 ]
 
