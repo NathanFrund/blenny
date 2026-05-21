@@ -344,18 +344,18 @@ BlennyWebApp >> startModules [
 
 { #category : 'server' }
 BlennyWebApp >> startOn: aPath [
+    config ifNil: [ config := BlennyServerConfig new.
+                    config port: (BlennyConfig current at: 'port' ifAbsent: [ 8081 ]) ].
     self startOn: aPath port: config port.
 ]
 
 { #category : 'server' }
 BlennyWebApp >> startOn: aPath port: aPortNumber [
     self stop.
-    config := BlennyServerConfig new
-        port: aPortNumber;
-        rootPath: (aPath ifNotNil: [ aPath asFileReference ]);
-        yourself.
-    config isDiskMode ifTrue: [ self setupDiskWatcher ].
-    self startServer
+    config port: aPortNumber.
+    config rootPath: (aPath ifNotNil: [ aPath asFileReference ]).
+    config rootPath ifNotNil: [ self setupDiskWatcher ].
+    self startServer.
 ]
 
 { #category : 'server' }
