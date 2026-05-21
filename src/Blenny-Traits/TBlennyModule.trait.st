@@ -30,10 +30,52 @@ TBlennyModule classSide >> isEnabled [
    ^ true
 ]
 
+{ #category : 'adding' }
+TBlennyModule >> addAuthenticationTo: aRouter appPublicPaths: appPublicPaths [
+    | allPublicPaths |
+    allPublicPaths := Set new.
+    allPublicPaths addAll: self publicPaths.
+    allPublicPaths addAll: appPublicPaths.
+    
+    aRouter addMiddlewareFirst: [ :nextHandler :request |
+        | path user response |
+        path := request uri pathPrintString.
+        Transcript show: 'Auth middleware checking path: ' , path; cr.
+        Transcript show: 'Public paths: ' , allPublicPaths asArray printString; cr.
+        
+        (allPublicPaths anySatisfy: [ :prefix |
+            prefix = '/'
+                ifTrue: [ path = '/' ]
+                ifFalse: [ path beginsWith: prefix ] ])
+            ifTrue: [ response := nextHandler value: request ]
+            ifFalse: [
+                user := self authenticateRequest: request.
+                user ifNotNil: [
+                    request environment at: #user put: user.
+                    response := nextHandler value: request ]
+                ifNil: [ response := self unauthorizedResponseFor: request ] ].
+        response ].
+    ^ aRouter
+
+]
+
 { #category : 'accessing' }
 TBlennyModule >> authProvider [
     "Subclasses must provide this"
     self subclassResponsibility
+]
+
+{ #category : 'authentication' }
+TBlennyModule >> authRoutes [
+    ^ #()
+]
+
+{ #category : 'auth-private' }
+TBlennyModule >> authenticateRequest: request [
+    | token |
+    token := self extractTokenFrom: request.
+    token ifNil: [ ^ nil ].
+    ^ self validateToken: token
 ]
 
 { #category : 'authentication' }
@@ -69,16 +111,44 @@ TBlennyModule >> directHtml: aString toUser: aUserId [
     BlennyPublisher directHtml: aString toUser: aUserId
 ]
 
+{ #category : 'auth-private' }
+TBlennyModule >> extractTokenFrom: request [
+    | cookie auth |
+    "Priority 1: blenny_token cookie"
+    cookie := request cookies detect: [ :c | c name = 'blenny_token' ] ifNone: [ nil ].
+    cookie ifNotNil: [ ^ cookie value ].
+    
+    "Priority 2: Authorization: Bearer <token>"
+    auth := request headers at: 'authorization' ifAbsent: [ ^ nil ].
+    (auth beginsWith: 'Bearer ') ifTrue: [
+        ^ auth size >= 8 
+            ifTrue: [ (auth copyFrom: 8) trimBoth ]
+            ifFalse: [ nil ]
+    ].
+    
+    ^ nil
+]
+
 { #category : 'lifecycle' }
 TBlennyModule >> initializeModule [
     "Called when module is loaded"
     ^ self
 ]
 
+{ #category : 'authentication' }
+TBlennyModule >> isAuthProvider [
+    ^ false
+]
+
 { #category : 'accessing' }
 TBlennyModule >> moduleName [
     "Returns 'blennyauth' if the class is BlennyAuthModule"
     ^ (self class name asString withoutSuffix: 'Module') asLowercase
+]
+
+{ #category : 'auth-configuration' }
+TBlennyModule >> publicPaths [
+    ^ #()
 ]
 
 { #category : 'required' }
@@ -130,4 +200,15 @@ TBlennyModule >> startModule [
 TBlennyModule >> stopModule [
     "Called when server stops"
     ^ self
+]
+
+{ #category : 'auth-token' }
+TBlennyModule >> unauthorizedResponseFor: request [
+    "Redirect to login page."
+    ^ ZnResponse redirect: '/login'
+]
+
+{ #category : 'auth-token' }
+TBlennyModule >> validateToken: aToken [
+    self subclassResponsibility
 ]

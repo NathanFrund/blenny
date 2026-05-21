@@ -34,21 +34,65 @@ Class {
 	#package : 'Blenny-Core'
 }
 
+{ #category : 'refactoring-pass' }
+BlennyRouter >> addMiddleware: aBlock [
+    globalMiddleware add: aBlock
+]
+
+{ #category : 'refactoring-pass' }
+BlennyRouter >> addMiddlewareFirst: aBlock [
+    "Add middleware that runs BEFORE everything else.
+     Used by BlennyAuthProvider / TBlennyModule."
+    globalMiddleware addFirst: aBlock
+]
+
 { #category : 'accessing' }
 BlennyRouter >> app [
    ^ app
 ]
 
-{ #category : 'middleware' }
-BlennyRouter >> applyGlobalMiddlewareTo: aBlock [
-    | wrapped |
-    wrapped := aBlock.
-    globalMiddleware reverseDo: [ :mw | 
-        | previousHandler |
-        "This temporary variable captures the state for THIS specific closure"
-        previousHandler := wrapped. 
-        wrapped := [ :req | mw value: previousHandler value: req ] ].
-    ^ wrapped
+{ #category : 'handlers' }
+BlennyRouter >> dispatchRequest: request [
+	"Pure routing logic - no middleware here."
+
+	| path |
+	path := request uri pathPrintString.
+
+	Transcript
+		show: 'dispatchRequest: ' , path;
+		cr.
+	Transcript
+		show: 'Current routes: ' , routes size asString;
+		cr.
+
+	"1. Module-registered routes"
+	routes do: [ :route |
+			| routePath routeMethod |
+			routePath := route at: 'path'.
+			routeMethod := route at: 'method'.
+			Transcript
+				show: 'Checking route: ' , routeMethod , ' ' , routePath;
+				cr.
+			(path = (route at: 'path') and: [
+				 request method = (route at: 'method') ]) ifTrue: [
+				Transcript show: 'Matched route: ' , request method , ' ' , path; cr.
+				^ self ensureResponse: ((route at: 'handler') value: request) ] ].
+
+	"2. SSE"
+	(path beginsWith: '/sse') ifTrue: [ ^ self handleSSE: request ].
+
+	"3. WebSocket"
+	(path beginsWith: '/ws') ifTrue: [ ^ self handleWebSocket: request ].
+
+	"4. Static files"
+	(path beginsWith: '/static/') ifTrue: [ ^ self handleStatic: request ].
+
+	"5. Home"
+	(path = '/' or: [ path isEmpty ]) ifTrue: [
+			^ self ensureResponse:
+				  (renderer renderPage: 'index' context: Dictionary new) ].
+
+	^ ZnResponse notFound: path
 ]
 
 { #category : 'authentication' }
@@ -76,29 +120,24 @@ BlennyRouter >> handleNotFound: request [
 
 { #category : 'handlers' }
 BlennyRouter >> handleRequest: request [
-   | path |
-   path := request uri pathPrintString.
+    "Build and execute the middleware pipeline around the core routing logic."
+    | coreRoutingBlock pipeline |
 
-   "1. Module-registered routes"
-   routes do: [ :route |
-      (path = (route at: 'path') and: [ request method = (route at: 'method') ]) ifTrue: [
-         ^ self ensureResponse: ((route at: 'handler') value: request) ] ].
+Transcript show: 'handleRequest: ' , request uri path; cr.
+    
+    "1. The core routing logic (no middleware involved)"
+    coreRoutingBlock := [ :req | self dispatchRequest: req ].
+    
+    "2. Build the onion: outer middleware wraps inner layers"
+    pipeline := coreRoutingBlock.
+    globalMiddleware reverseDo: [ :middleware |
+        | next |
+        next := pipeline.
+        pipeline := [ :req | middleware value: next value: req ] ].
+    
+    "3. Execute the whole pipeline"
+    ^ pipeline value: request
 
-   "2. SSE endpoint – always available"
-   (path beginsWith: '/sse') ifTrue: [ ^ self handleSSE: request ].
-
-   "3. WebSocket endpoint – only if WebSocket bridge is enabled"
-   (path beginsWith: '/ws') ifTrue: [ ^ self handleWebSocket: request ].
-
-   "4. Static files"
-   (path beginsWith: '/static/') ifTrue: [ ^ self handleStatic: request ].
-
-   "5. Home"
-   (path = '/' or: [ path isEmpty ]) ifTrue: [
-      ^ self ensureResponse: (renderer renderPage: 'index' context: Dictionary new) ].
-
-   "9. 404"
-   ^ ZnResponse notFound: path
 ]
 
 { #category : 'handlers' }
@@ -212,33 +251,29 @@ BlennyRouter >> intentsFromRequest: request defaults: aCollection [
 
 { #category : 'module-registration' }
 BlennyRouter >> registerGet: aPath handler: aBlock [
-    | wrappedHandler |
-    wrappedHandler := self applyGlobalMiddlewareTo: aBlock.
-    routes add: { 
-        'method' -> #GET. 
-        'path' -> aPath. 
-        'handler' -> wrappedHandler 
-    } asDictionary.
+    routes add: {
+        'method' -> #GET.
+        'path' -> aPath.
+        'handler' -> aBlock
+    } asDictionary
 ]
 
 { #category : 'module-registration' }
 BlennyRouter >> registerPost: aPath handler: aBlock [
-    | wrappedHandler |
-    wrappedHandler := self applyGlobalMiddlewareTo: aBlock.
-    routes add: { 
-        'method' -> #POST. 
-        'path' -> aPath. 
-        'handler' -> wrappedHandler 
-    } asDictionary.
+    routes add: {
+        'method' -> #POST.
+        'path' -> aPath.
+        'handler' -> aBlock
+    } asDictionary
 ]
 
-{ #category : 'accessing' }
+{ #category : 'refactoring-pass' }
 BlennyRouter >> rootPath: aRootPath [
 
 rootPath := aRootPath 
 ]
 
-{ #category : 'accessing' }
+{ #category : 'refactoring-pass' }
 BlennyRouter >> routes [ 
 	^ routes.
 ]
@@ -267,19 +302,19 @@ BlennyRouter >> runSSEStream: socketStream forUser: userId withBridge: bridge in
     ].
 ]
 
-{ #category : 'accessing' }
+{ #category : 'refactoring-pass' }
 BlennyRouter >> sseBridge [
    "The always‑present SSE bridge"
    ^ app sseBridge
 ]
 
-{ #category : 'middleware' }
+{ #category : 'refactoring-pass' }
 BlennyRouter >> use: aMiddleware [
     "Add global middleware"
     globalMiddleware add: aMiddleware.
 ]
 
-{ #category : 'accessing' }
+{ #category : 'refactoring-pass' }
 BlennyRouter >> wsBridge [
    "The optional WebSocket sidecar, if enabled"
    ^ app optionalTransports

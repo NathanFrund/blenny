@@ -42,6 +42,11 @@ BlennyLoginHandler >> authProvider [
 { #category : 'handling' }
 BlennyLoginHandler >> handleGet: request [
     | html |
+
+Transcript show: 'LoginHandler handleGet called'; cr.
+    Transcript show: '   renderer: ' , renderer class name; cr.
+    Transcript show: '   loginTemplate: ' , self loginTemplate; cr.
+
     html := renderer renderPage: self loginTemplate context: Dictionary new.
     ^ ZnResponse ok: (ZnEntity html: html)
 
@@ -103,7 +108,7 @@ BlennyLoginHandler >> redirectWithCookie: sessionId [
     response := ZnResponse redirect: '/'.
     
     "Use the proper Zinc cookie object"
-    cookie := (ZnCookie name: 'session' value: sessionId)
+    cookie := (ZnCookie name: 'blenny_token' value: sessionId)
         path: '/';
         httponly: true;
         yourself.

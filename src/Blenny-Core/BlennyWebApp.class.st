@@ -24,6 +24,7 @@ Class {
 		'port',
 		'rootPath',
 		'conduit',
+		'authService',
 		'authProvider',
 		'renderer',
 		'registerHandler',
@@ -58,9 +59,27 @@ BlennyWebApp >> announceStarted [
 					 mode })
 ]
 
+{ #category : 'as yet unclassified' }
+BlennyWebApp >> appPublicPaths [
+    "Return application-wide path prefixes that should be public (no authentication).
+     Defaults can be overridden via BlennyConfig key 'app.public_paths'."
+    ^ BlennyConfig current at: 'app.public_paths' ifAbsent: [ #('/' '/static/' '/health') ]
+]
+
 { #category : 'accessing' }
 BlennyWebApp >> authProvider [
     ^ authProvider
+]
+
+{ #category : 'refactoring-pass' }
+BlennyWebApp >> autoDiscoverAuthProvider [
+    | candidates |
+    candidates := self modules select: [ :m | m isAuthProvider ].
+    
+    candidates size > 1 ifTrue: [
+        StringSignal emit: ('Multiple auth providers enabled. Using first: ', candidates first class name) ].
+    
+    ^ candidates ifNotEmpty: [ candidates first ] ifEmpty: [ nil ]
 ]
 
 { #category : 'broadcasting' }
@@ -103,6 +122,41 @@ BlennyWebApp >> broadcastMessage: aMessage [
 	^ self
 ]
 
+{ #category : 'refactoring-pass' }
+BlennyWebApp >> buildRouter [
+    | activeAuth |
+
+    activeAuth := self discoverAuthProvider.
+
+Transcript show: 'Active auth provider: ' , activeAuth class name; cr.
+Transcript show: 'Its publicPaths: ' , activeAuth publicPaths asArray printString; cr.
+Transcript show: 'Its authRoutes count: ' , activeAuth authRoutes size asString; cr.
+    
+    router := BlennyRouter new initializeWith: {
+        'renderer' -> renderer.
+        'app' -> self.
+        'rootPath' -> rootPath
+    } asDictionary.
+    
+    "1. Auth Layer"
+    activeAuth ifNotNil: [
+    router := activeAuth addAuthenticationTo: router appPublicPaths: self appPublicPaths.
+    self registerAuthRoutes: activeAuth on: router.
+].
+
+Transcript show: 'All routes after auth registration:'; cr.
+router routes do: [ :r | Transcript show: '  ' , (r at: 'path'); cr ].
+router registerGet: '/test' handler: [ :req | ZnResponse ok: (ZnEntity html: 'test') ].
+        
+    "2. Register normal modules"
+    self registerModulesWithRouter: router.
+    
+    "3. Default middleware"
+    self setupDefaultMiddlewareOn: router.
+        
+    ^ router
+]
+
 { #category : 'accessing' }
 BlennyWebApp >> conduit [
 	^ conduit
@@ -110,23 +164,25 @@ BlennyWebApp >> conduit [
 
 { #category : 'initialization' }
 BlennyWebApp >> createAuthProvider [
+    "Return the default auth *module* (not the service)"
+    | authService module |
+    
+    authService := BlennySimpleAuth new.
+    authService repository: (BlennyMemoryRepository new).   "adjust as needed"
+    
+    module := LoginFormAuthModule new.
+    module authService: authService.
+    module renderer: renderer.
+    
+    ^ module
+]
 
-	| persistenceType repository auth |
-	persistenceType := BlennyConfig current
-		                   at: 'persistence.type'
-		                   ifAbsent: [ 'memory' ].
-
-
-	repository := BlennyMemoryRepository new.
-
-
-	auth := BlennySimpleAuth new.
-
-
-	auth repository: repository.
-
-
-	^ auth
+{ #category : 'as yet unclassified' }
+BlennyWebApp >> createAuthService [
+    | authService |
+    authService := BlennySimpleAuth new.
+    authService repository: (BlennyMemoryRepository new).  "or from config"
+    ^ authService
 ]
 
 { #category : 'publishing' }
@@ -141,6 +197,13 @@ BlennyWebApp >> directHtml: aString toUser: aUserId [
     self
       broadcast: (Dictionary with: #html -> aString with: #category -> #ui)
       toUser: aUserId
+]
+
+{ #category : 'refactoring-pass' }
+BlennyWebApp >> discoverAuthProvider [
+    "Explicit authProvider takes precedence. Falls back to self-assembling discovery."
+    authProvider ifNotNil: [ ^ authProvider ].
+    ^ self autoDiscoverAuthProvider
 ]
 
 { #category : 'modules' }
@@ -164,8 +227,14 @@ BlennyWebApp >> initialize [
 
 	super initialize.
 	port := BlennyConfig current at: 'port' ifAbsent: [ 8081 ].
-	authProvider := self createAuthProvider.
 	modules := OrderedCollection new.
+]
+
+{ #category : 'refactoring-pass' }
+BlennyWebApp >> initializeLoadedModules [
+    "Initialize all loaded modules - matches your existing 'modules' collection"
+    self modules do: [ :module |
+        module initializeModule ]
 ]
 
 { #category : 'modules' }
@@ -174,8 +243,8 @@ BlennyWebApp >> loadModule: aModuleClass [
     module := aModuleClass new.
     
     "Always inject authProvider and renderer"
-    (module respondsTo: #authProvider:) ifTrue: [
-        module authProvider: authProvider ].
+    (module respondsTo: #authService:) ifTrue: [
+        module authService: self createAuthService ].
     (module respondsTo: #renderer:) ifTrue: [
         module renderer: renderer ].
     
@@ -193,8 +262,26 @@ BlennyWebApp >> loadModules [
 ]
 
 { #category : 'accessing' }
+BlennyWebApp >> modules [
+	^ modules
+]
+
+{ #category : 'accessing' }
 BlennyWebApp >> optionalTransports [
    ^ optionalTransports
+]
+
+{ #category : 'refactoring-pass' }
+BlennyWebApp >> registerAuthRoutes: anAuthModule on: aRouter [
+    anAuthModule authRoutes do: [ :dict |
+        | method path handler |
+        method := dict at: #method ifAbsent: [ #GET ].
+        path := dict at: #path.
+        handler := dict at: #handler.
+Transcript show: 'Registering auth route: ' , method , ' ' , path; cr.        
+        method = #GET ifTrue: [ aRouter registerGet: path handler: handler ].
+        method = #POST ifTrue: [ aRouter registerPost: path handler: handler ].
+]
 ]
 
 { #category : 'modules' }
@@ -265,62 +352,50 @@ BlennyWebApp >> startOn: aPath port: aPortNumber [
 BlennyWebApp >> startServer [
 
 	| bindAddress encoderClass |
-	
 	BlennyConfig reset.
 	BlennyPublisher reset.
-	
-	"Start logging"
-   BlennyFileLogger attachToBeacon.
-	
+	BlennyFileLogger attachToBeacon.
+
 	ZnServer allInstancesDo: [ :s | s port = port ifTrue: [ s stop ] ].
 
 	bindAddress := BlennyConfig current bindAddress.
-
 	encoderClass := Smalltalk at: (BlennyConfig current
 			                 at: 'sse.encoder'
 			                 ifAbsent: [ #BlennyStandardSSEEncoder ]) asSymbol.
-			
+
 	sseBridge := BlennySSEBridge new
 		             initializeWithEncoder: encoderClass new name: 'sse';
 		             start.
 
-	"Optional transports (WebSocket sidecar, initially empty)"
 	optionalTransports := OrderedCollection new.
 
-	"Create renderer (conduit is now available)"
+	rootPath ifNotNil: [ self setupDiskWatcher ].
+
 	renderer := BlennyRenderer new
 		            initializeWithConduit: conduit
 		            rootPath: rootPath.
 
-
 	"===== MODULE LOADING ====="
-	self loadModules. "← Discover and instantiate modules"
-	self startModules. "← Call startModule on each"
+	self loadModules.
+	self startModules.
 	"========================="
 
-	"Create router with ALL dependencies injected"
-	router := BlennyRouter new initializeWith: {
-			          ('renderer' -> renderer).
-			          ('app' -> self). "allows router to fetch bridges on demand"
-			          ('rootPath' -> rootPath) } asDictionary.
+	"Build router with new pluggable auth system"
+	router := self buildRouter.
 
-	"Setup middleware on router"
-	self setupDefaultMiddlewareOn: router.
-	self registerModulesWithRouter: router.
+	"Retain the auth service for cleanup"
+	authService := self discoverAuthProvider
+		               ifNotNil: [ :provider | provider authService ]
+		               ifNil: [ nil ].
 
-	"===== REGISTER MODULES WITH ROUTER ====="
-	self registerModulesWithRouter: router.
-	"========================================"
-
-
+	"Start HTTP server"
 	server := ZnServer on: port.
 	server bindingAddress:
 		(NetNameResolver addressForName: bindAddress) asByteArray.
 	server delegate: router.
 	server start.
 
-		StringSignal emit: ('Server started on port {1}. SSE: http://localhost:{1}/sse. WebSocket optional.' format: { port }).
-	
+	self announceStarted
 ]
 
 { #category : 'server' }
@@ -335,18 +410,19 @@ BlennyWebApp >> stop [
 	
 	(Delay forMilliseconds: 100) wait.
 
-	"4 Stop HTTP server"
+	"3 Stop HTTP server"
 	server ifNotNil: [
 			server stop.
 			server := nil ].
 
-	"5 Stop Conduit file watcher"
+	"4 Stop Conduit file watcher"
 	conduit ifNotNil: [
 			conduit stop.
 			conduit := nil ].
 
-	"6 Stop auth janitor"
-	authProvider shutdown.
+	"5. Stop auth service (token validator)"
+    authService ifNotNil: [ authService shutdown ].
+
 
 	"6. Reset so next start sees fresh values"
 	BlennyConfig reset.

@@ -32,20 +32,14 @@ BlennyLogoutHandler >> handleGet: request [
     ^ self handlePost: request
 ]
 
-{ #category : 'handling' }
+{ #category : 'private' }
 BlennyLogoutHandler >> handlePost: request [
-
-    | cookie sessionId |
-    
-    "Find the 'session' cookie in the request's cookie collection"
-    cookie := request cookies 
-        detect: [ :each | each name = 'session' ] 
-        ifNone: [ nil ].
-        
-    sessionId := cookie ifNotNil: [ cookie value ].
-    
-    sessionId ifNotNil: [ authProvider logout: sessionId ].
-    
+    | cookie token |
+    Transcript show: 'Logout handler called'; cr.
+    cookie := request cookies detect: [ :each | each name = 'blenny_token' ] ifNone: [ nil ].
+    token := cookie ifNotNil: [ cookie value ].
+    Transcript show: 'Token found: ' , (token ifNil: ['nil'] ifNotNil: [token]); cr.
+    token ifNotNil: [ authProvider logout: token ].
     ^ self redirectToLogin
 
 ]
@@ -58,15 +52,18 @@ BlennyLogoutHandler >> initializeWithAuth: anAuthProvider [
 { #category : 'private' }
 BlennyLogoutHandler >> redirectToLogin [
     | response cookie |
-    
+    Transcript show: 'Logout handler called'; cr.
     response := ZnResponse redirect: '/login'.
+
+	Transcript show: 'Logout called!'.
     
-    cookie := (ZnCookie name: 'session' value: '')
+    cookie := (ZnCookie name: 'blenny_token' value: '')
         path: '/';
         maxage: 0;
         httponly: true;
         yourself.
         
     response addCookie: cookie.
+Transcript show: 'Logout response headers: ' , response headers asString; cr.
     ^ response
 ]
