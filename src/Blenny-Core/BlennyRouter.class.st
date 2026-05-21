@@ -58,21 +58,11 @@ BlennyRouter >> dispatchRequest: request [
 	| path |
 	path := request uri pathPrintString.
 
-	Transcript
-		show: 'dispatchRequest: ' , path;
-		cr.
-	Transcript
-		show: 'Current routes: ' , routes size asString;
-		cr.
-
 	"1. Module-registered routes"
 	routes do: [ :route |
 			| routePath routeMethod |
 			routePath := route at: 'path'.
 			routeMethod := route at: 'method'.
-			Transcript
-				show: 'Checking route: ' , routeMethod , ' ' , routePath;
-				cr.
 			(path = (route at: 'path') and: [
 				 request method = (route at: 'method') ]) ifTrue: [
 				Transcript show: 'Matched route: ' , request method , ' ' , path; cr.
@@ -122,8 +112,6 @@ BlennyRouter >> handleNotFound: request [
 BlennyRouter >> handleRequest: request [
     "Build and execute the middleware pipeline around the core routing logic."
     | coreRoutingBlock pipeline |
-
-Transcript show: 'handleRequest: ' , request uri path; cr.
     
     "1. The core routing logic (no middleware involved)"
     coreRoutingBlock := [ :req | self dispatchRequest: req ].

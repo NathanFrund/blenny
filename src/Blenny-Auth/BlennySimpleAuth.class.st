@@ -150,12 +150,13 @@ BlennySimpleAuth >> repository: aRepository [
 
 { #category : 'password-reset' }
 BlennySimpleAuth >> resetPassword: token newPassword: aPassword [
-    | email |
-    email := self validatePasswordResetToken: token.
-    email ifNil: [ ^ false ].
-    self createUser: email password: aPassword.
-    repository deleteResetToken: token.
-    ^ true
+
+	| email |
+	email := self validatePasswordResetToken: token.
+	email ifNil: [ ^ false ].
+	self createUser: email password: aPassword.
+	repository deleteResetToken: token.
+	^ true
 ]
 
 { #category : 'system' }
@@ -172,10 +173,11 @@ BlennySimpleAuth >> shutdown [
 
 { #category : 'blacklist' }
 BlennySimpleAuth >> startBlacklistJanitor [
-    janitorProcess := [
-        [ true ] whileTrue: [
+
+    janitorProcess := [ 
+        [ true ] whileTrue: [ 
             (Delay forMinutes: 5) wait.
-            self cleanupBlacklist.  "← This is correct"
+            self cleanupBlacklist.
             StringSignal emit: 'Blacklist cleanup complete.'.
         ]
     ] forkAt: Processor userBackgroundPriority named: 'BlennyAuthJanitor'.
@@ -183,9 +185,12 @@ BlennySimpleAuth >> startBlacklistJanitor [
 
 { #category : 'blacklist' }
 BlennySimpleAuth >> stopBlacklistJanitor [
-    janitorProcess ifNotNil: [ 
+
+    janitorProcess ifNotNil: [
         janitorProcess terminate.
-        janitorProcess := nil ].
+        janitorProcess := nil.
+        Transcript show: '   Janitor terminated.'; cr ]
+    ifNil: [ Transcript show: '   Janitor already nil.'; cr ].
 ]
 
 { #category : 'user management' }

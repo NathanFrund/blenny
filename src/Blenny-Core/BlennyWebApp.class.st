@@ -136,14 +136,6 @@ BlennyWebApp >> conduit [
 	^ conduit
 ]
 
-{ #category : 'authentication' }
-BlennyWebApp >> createAuthService [
-    "FIXME: Make configurable via blenny.json (auth.service_class, auth.repository_class)."
-    ^ BlennySimpleAuth new
-        repository: BlennyMemoryRepository new;
-        yourself
-]
-
 { #category : 'publishing' }
 BlennyWebApp >> directData: aString toUser: aUserId [
    self
@@ -220,7 +212,7 @@ BlennyWebApp >> loadModule: aModuleClass [
     
     "Always inject authProvider and renderer"
     (module respondsTo: #authService:) ifTrue: [
-        module authService: self createAuthService ].
+        module authService: authService ].
     (module respondsTo: #renderer:) ifTrue: [
         module renderer: renderer ].
     
@@ -287,6 +279,14 @@ BlennyWebApp >> server [
 	^ server
 ]
 
+{ #category : 'server - private' }
+BlennyWebApp >> setupAuthService [
+    Transcript show: 'setupAuthService called'; cr.
+    authService := BlennySimpleAuth new
+        repository: BlennyMemoryRepository new;
+        yourself.
+]
+
 { #category : 'middleware' }
 BlennyWebApp >> setupDefaultMiddlewareOn: aRouter [
     "Apply default middleware to the router"
@@ -318,18 +318,19 @@ BlennyWebApp >> setupRouter [
     self loadModules.   "already loads and initializes modules"
     self startModules.
     router := self buildRouter.
-    "Retain auth service for cleanup"
-    authService := (self discoverAuthProvider) ifNotNil: [ :p | p authService ]
 ]
 
 { #category : 'server - private' }
 BlennyWebApp >> setupSSE [
-    | encoderClass |
-    encoderClass := Smalltalk at: (BlennyConfig current at: 'sse.encoder' ifAbsent: [ #BlennyStandardSSEEncoder ]) asSymbol.
-    sseBridge := BlennySSEBridge new
-        initializeWithEncoder: encoderClass new name: 'sse';
-        start.
-    optionalTransports := OrderedCollection new.
+
+	| encoderClass |
+	encoderClass := Smalltalk at: (BlennyConfig current
+			                 at: 'sse.encoder'
+			                 ifAbsent: [ #BlennyStandardSSEEncoder ]) asSymbol.
+	sseBridge := BlennySSEBridge new
+		             initializeWithEncoder: encoderClass new name: 'sse';
+		             start.
+	optionalTransports := OrderedCollection new
 ]
 
 { #category : 'accessing' }
@@ -360,15 +361,17 @@ BlennyWebApp >> startOn: aPath port: aPortNumber [
 
 { #category : 'server' }
 BlennyWebApp >> startServer [
-    self resetGlobalState.
-    self stopConflictingServers.
-    self setupSSE.
-    self setupRenderer.
-    self loadModules.
-    self startModules.
-    self setupRouter.
-    self startZnServer.
-    self announceStarted
+
+	self resetGlobalState.
+	self stopConflictingServers.
+	self setupSSE.
+	self setupRenderer.
+	self setupAuthService.
+	self loadModules.
+	self startModules.
+	self setupRouter.
+	self startZnServer.
+	self announceStarted
 ]
 
 { #category : 'server - private' }
