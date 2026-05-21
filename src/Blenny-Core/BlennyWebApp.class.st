@@ -30,7 +30,8 @@ Class {
 		'sseBridge',
 		'optionalTransports',
 		'modules',
-		'router'
+		'router',
+		'config'
 	],
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
@@ -113,7 +114,7 @@ BlennyWebApp >> buildRouter [
 
 	| activeAuth |
 	activeAuth := self discoverAuthProvider.
-
+	authProvider := activeAuth.
 	router := BlennyRouter new initializeWith: {
 			          ('renderer' -> renderer).
 			          ('app' -> self).

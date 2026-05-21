@@ -106,11 +106,11 @@ BlennyRouter >> ensureResponse: anObject [
 
 { #category : 'authentication' }
 BlennyRouter >> extractTokenFrom: request [
-    "Extract JWT token from URL or cookie"
-    | token |
+    | token cookie |
     token := request uri queryAt: 'token' ifAbsent: [ nil ].
-    token ifNil: [ token := BlennyMiddleware extractTokenFromCookie: request ].
-    ^ token
+    token ifNotNil: [ ^ token ].
+    cookie := request cookies detect: [ :c | c name = 'blenny_token' ] ifNone: [ nil ].
+    ^ cookie ifNotNil: [ cookie value ] ifNil: [ nil ]
 ]
 
 { #category : 'handlers' }
