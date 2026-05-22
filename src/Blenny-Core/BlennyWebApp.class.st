@@ -29,7 +29,8 @@ Class {
 		'optionalTransports',
 		'modules',
 		'router',
-		'config'
+		'config',
+		'blacklistCleaner'
 	],
 	#category : 'Blenny-Core',
 	#package : 'Blenny-Core'
@@ -281,10 +282,12 @@ BlennyWebApp >> server [
 
 { #category : 'server - private' }
 BlennyWebApp >> setupAuthService [
-    Transcript show: 'setupAuthService called'; cr.
+    "Create the single auth service instance and its blacklist cleaner."
     authService := BlennySimpleAuth new
         repository: BlennyMemoryRepository new;
         yourself.
+    blacklistCleaner := BlennyBlacklistCleaner forRepository: authService repository.
+    blacklistCleaner start.
 ]
 
 { #category : 'middleware' }
@@ -399,10 +402,10 @@ BlennyWebApp >> stop [
 			server stop.
 			server := nil ].
 
-	"4. Stop auth service (token validator)"
-    authService ifNotNil: [ authService shutdown ].
+	"4. Shutdown the jwt blacklist janitor"
+	blacklistCleaner ifNotNil: [ blacklistCleaner stop ].
 
-	"6. Reset so next start sees fresh values"
+	"5. Reset so next start sees fresh values"
 	BlennyConfig reset.
 	BlennyPublisher reset.
 	BlennyFileLogger detachFromBeacon.

@@ -14,8 +14,7 @@ Class {
 	#name : 'BlennySimpleAuth',
 	#superclass : 'Object',
 	#instVars : [
-		'repository',
-		'janitorProcess'
+		'repository'
 	],
 	#category : 'Blenny-Auth',
 	#package : 'Blenny-Auth'
@@ -145,7 +144,6 @@ BlennySimpleAuth >> repository: aRepository [
 	repository := aRepository.
 	"Now that repository is set, start the janitor"
 	self cleanupBlacklist.
-	self startBlacklistJanitor
 ]
 
 { #category : 'password-reset' }
@@ -163,34 +161,6 @@ BlennySimpleAuth >> resetPassword: token newPassword: aPassword [
 BlennySimpleAuth >> shutDown [
     "Pharo system hook - called on image shutdown"
     self shutdown.
-]
-
-{ #category : 'shutdown' }
-BlennySimpleAuth >> shutdown [
-    "Clean up background processes"
-    self stopBlacklistJanitor.
-]
-
-{ #category : 'blacklist' }
-BlennySimpleAuth >> startBlacklistJanitor [
-
-    janitorProcess := [ 
-        [ true ] whileTrue: [ 
-            (Delay forMinutes: 5) wait.
-            self cleanupBlacklist.
-            StringSignal emit: 'Blacklist cleanup complete.'.
-        ]
-    ] forkAt: Processor userBackgroundPriority named: 'BlennyAuthJanitor'.
-]
-
-{ #category : 'blacklist' }
-BlennySimpleAuth >> stopBlacklistJanitor [
-
-    janitorProcess ifNotNil: [
-        janitorProcess terminate.
-        janitorProcess := nil.
-        Transcript show: '   Janitor terminated.'; cr ]
-    ifNil: [ Transcript show: '   Janitor already nil.'; cr ].
 ]
 
 { #category : 'user management' }
