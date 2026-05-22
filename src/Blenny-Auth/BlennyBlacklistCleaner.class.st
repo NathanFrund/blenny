@@ -17,7 +17,7 @@ Instance Variables:
     repository       <BlennyAuthRepository>  the repository containing the blacklist
     process          <Process>               the background process (nil when stopped)
     intervalSeconds  <Integer>               delay between cleanups (default 300)
-
+	 isRunning        <Boolean>               flag to signal graceful exit
 "
 Class {
 	#name : 'BlennyBlacklistCleaner',
@@ -25,7 +25,8 @@ Class {
 	#instVars : [
 		'repository',
 		'process',
-		'intervalSeconds'
+		'intervalSeconds',
+		'isRunning'
 	],
 	#category : 'Blenny-Auth',
 	#package : 'Blenny-Auth'
@@ -33,40 +34,73 @@ Class {
 
 { #category : 'instance creation' }
 BlennyBlacklistCleaner class >> forRepository: aRepository [
-    ^ self new repository: aRepository; yourself
+
+	^ self new
+		  repository: aRepository;
+		  yourself
 ]
 
 { #category : 'accessing' }
 BlennyBlacklistCleaner >> intervalSeconds: anInteger [
-    intervalSeconds := anInteger
+
+	(anInteger isInteger and: [ anInteger > 0 ])
+		ifTrue: [ intervalSeconds := anInteger ]
+		ifFalse: [ self error: 'intervalSeconds must be a positive integer' ]
+]
+
+{ #category : 'testing' }
+BlennyBlacklistCleaner >> isStarted [
+    ^ process notNil and: [ process isTerminated not ]
+
 ]
 
 { #category : 'cleanup' }
 BlennyBlacklistCleaner >> performCleanup [
-    "Run one cleanup cycle immediately (for testing and manual invocation)."
-    repository ifNotNil: [ repository cleanupExpiredBlacklist ]
 
+	[ repository ifNotNil: [ repository cleanupExpiredBlacklist ] ]
+		on: Error
+		do: [ :ex |
+				StringSignal emit:
+					('BlennyBlacklistCleaner error: {1}' format: { ex messageText }) ]
+]
+
+{ #category : 'cleanup' }
+BlennyBlacklistCleaner >> performCleanupWithErrorHandling [
+	"Run one cleanup immediately, then loop at interval while isRunning."
+
+	self performCleanup.
+	[ isRunning ] whileTrue: [
+			(Delay forSeconds: intervalSeconds) wait.
+			isRunning ifTrue: [ self performCleanup ] ]
 ]
 
 { #category : 'accessing' }
 BlennyBlacklistCleaner >> repository: aRepository [
-    repository := aRepository
+
+	repository := aRepository
 ]
 
 { #category : 'accessing' }
 BlennyBlacklistCleaner >> start [
-    intervalSeconds ifNil: [ intervalSeconds := 300 ].
-    process := [ 
-        [ true ] whileTrue: [ 
-            (Delay forSeconds: intervalSeconds) wait.
-            self performCleanup ]
-    ] forkAt: Processor userBackgroundPriority named: 'BlennyBlacklistCleaner'.
 
+	intervalSeconds ifNil: [ intervalSeconds := 300 ].
+	isRunning := true.
+	process := [ self performCleanupWithErrorHandling ]
+		           forkAt: Processor userBackgroundPriority
+		           named: 'BlennyBlacklistCleaner'.
+	StringSignal emit: 'BlennyBlacklistCleaner started (interval: '
+		, intervalSeconds asString , 's)'
 ]
 
 { #category : 'accessing' }
 BlennyBlacklistCleaner >> stop [
-    process ifNotNil: [ 
-        process terminate.
-        process := nil ]
+    isRunning ifFalse: [ ^ self ].
+    isRunning := false.
+    "Give the process time to finish the current cleanup"
+    process ifNotNil: [
+        (Delay forMilliseconds: 2000) wait.
+        process ifNotNil: [
+            process terminate.
+            process := nil ] ].
+    StringSignal emit: 'BlennyBlacklistCleaner stopped'.
 ]
