@@ -405,6 +405,7 @@ BlennyWebApp >> stop [
 	"6. Reset so next start sees fresh values"
 	BlennyConfig reset.
 	BlennyPublisher reset.
+	BlennyFileLogger detachFromBeacon.
 
 	StringSignal emit: 'Blenny server stopped.'
 ]
