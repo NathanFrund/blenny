@@ -1,0 +1,31 @@
+<div class="card-body">
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">Username</span>
+        </label>
+        <input type="text" name="username" placeholder="username" 
+               value="{{username}}" class="input input-bordered" required>
+    </div>
+    
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">Password</span>
+        </label>
+        <input type="password" name="password" placeholder="password" 
+               class="input input-bordered" required>
+    </div>
+    
+    <div class="form-control mt-6">
+        <button type="submit" class="btn btn-primary">Login</button>
+    </div>
+    
+    <label class="label">
+        <a href="/register" class="label-text-alt link link-hover">Create an account</a>
+    </label>
+    
+    {{#error}}
+<div class="alert alert-error mt-4">
+    {{.}}
+</div>
+{{/error}}
+</div>

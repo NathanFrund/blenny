@@ -1,0 +1,11 @@
+<div class="hero min-h-screen bg-base-200">
+    <div class="hero-content flex-col">
+        <div class="card shrink-0 w-full max-w-sm shadow-2xl bg-base-100">
+            <form hx-post="/login" hx-target="#login-form" hx-swap="outerHTML">
+                <div id="login-form">
+                    {{> login_form}}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

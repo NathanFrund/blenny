@@ -1,0 +1,18 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pharo + htmx Explorer</title>
+    <script src="https://unpkg.com/htmx.org@2.0.0"></script>
+    
+    <link rel="stylesheet" type="text/css" href="/static/css/style.css">
+    <style>
+    #status { padding: 1em; background: #e0ffe0; border-radius: 0.5em; }
+    </style>
+</head>
+<body class="" data-signals="{'connected': false}"
+    data-init="@get('/sse', {openWhenHidden: true})">
+    <div class="">
+        {{{content}}}
+    </div>
+</body>
+</html>

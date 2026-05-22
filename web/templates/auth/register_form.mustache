@@ -1,0 +1,58 @@
+<div class="form-control">
+  <label class="label">
+    <span class="label-text">Email</span>
+  </label>
+  <input
+    type="email"
+    name="email"
+    placeholder="email"
+    autocomplete="email"
+    value="{{email}}"
+    class="input input-bordered"
+    required
+  />
+</div>
+
+<div class="form-control">
+  <label class="label">
+    <span class="label-text">Password</span>
+  </label>
+  <input
+    type="password"
+    name="password"
+    placeholder="password"
+    autocomplete="new-password"
+    class="input input-bordered"
+    required
+  />
+</div>
+
+<div class="form-control">
+  <label class="label">
+    <span class="label-text">Confirm Password</span>
+  </label>
+  <input
+    type="password"
+    name="password_confirm"
+    placeholder="confirm password"
+    autocomplete="new-password"
+    class="input input-bordered"
+    required
+  />
+</div>
+
+<div class="form-control mt-6">
+  <button type="submit" class="btn btn-primary">Create Account</button>
+</div>
+
+<label class="label">
+  <a href="/login" class="label-text-alt link link-hover"
+    >Already have an account? Login</a
+  >
+</label>
+
+{{#error}}
+<div class="alert alert-error mt-4">
+    {{.}}
+</div>
+{{/error}}
