@@ -11,22 +11,18 @@ BlennyBlacklistCleanerTest >> testPerformCleanupRemovesExpiredEntries [
     repository := BlennyMemoryRepository new.
     cleaner := BlennyBlacklistCleaner forRepository: repository.
     
-    "Add an expired entry (1 hour ago)"
     expiredJti := 'expired-jti'.
     expirationDate := DateAndTime now - (1 * 60 * 60).
     repository saveBlacklistEntry: expiredJti expiration: expirationDate.
     
-    "Add a valid entry (1 hour from now)"
     validJti := 'valid-jti'.
     validExpiration := DateAndTime now + (1 * 60 * 60).
     repository saveBlacklistEntry: validJti expiration: validExpiration.
     
-    "Perform cleanup" 
     cleaner performCleanup.
     
-    "Expired entry should be gone; valid entry remains"
-    self assert: (repository isBlacklisted: expiredJti) equals: false.
-    self assert: (repository isBlacklisted: validJti) equals: true.
+    self deny: (repository isBlacklisted: expiredJti).
+    self assert: (repository isBlacklisted: validJti).
 ]
 
 { #category : 'tests' }
@@ -53,5 +49,6 @@ BlennyBlacklistCleanerTest >> testPerformCleanupWithNoExpiredEntries [
     
     cleaner performCleanup.
     
-    self assert: (repository isBlacklisted: jti) equals: true.
+    self assert: (repository isBlacklisted: jti).
+
 ]
