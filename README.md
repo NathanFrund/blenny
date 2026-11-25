@@ -103,11 +103,20 @@ Make sure you set `sse.encoder` as outlined below.
 app := BlennyWebApp new.
 app startOn: nil port: 8081.
 
+
 "Broadcast to all connected clients"
 BlennyPublisher broadcastHtml: '<div class="alert">Hello world!</div>'
 
 "Direct message to a specific user"
 BlennyPublisher directHtml: '<div>Private message</div>' toUser: 'alice'
+```
+
+### Start with templates
+
+```smalltalk
+path := '/path/to/mustache/templates'.
+app := BlennyWebApp new.
+app startOn: path port: 8081.
 ```
 
 ### Enable WebSockets (optional)
